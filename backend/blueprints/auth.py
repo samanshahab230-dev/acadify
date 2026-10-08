@@ -46,40 +46,30 @@ def login():
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for('main.index'))
+        return jsonify({'authenticated': True, 'role': current_user.role})
 
     if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        email = request.form.get('email', '').strip()
-        password = request.form.get('password', '')
-        confirm_password = request.form.get('confirm_password', '')
-        roll_no = request.form.get('roll_no', '').strip().upper()
-        department = request.form.get('department', '').strip()
-        semester = request.form.get('semester', 1)
+        data = request.get_json(silent=True) or request.form
+        name = data.get('name', '').strip()
+        email = data.get('email', '').strip()
+        password = data.get('password', '')
+        confirm_password = data.get('confirm_password', '')
+        roll_no = data.get('roll_no', '').strip().upper()
+        department = data.get('department', '').strip()
+        semester = data.get('semester', 1)
 
-        # Basic validations
         if not name or not email or not password or not roll_no or not department:
-            flash('Please fill in all required fields.', 'danger')
-            return render_template('auth/register.html')
-
+            return jsonify({'status': 'error', 'message': 'Please fill in all required fields.'}), 400
         if password != confirm_password:
-            flash('Passwords do not match.', 'danger')
-            return render_template('auth/register.html')
-
+            return jsonify({'status': 'error', 'message': 'Passwords do not match.'}), 400
         if len(password) < 6:
-            flash('Password must be at least 6 characters long.', 'danger')
-            return render_template('auth/register.html')
-
-        # Check existing roll no
+            return jsonify({'status': 'error', 'message': 'Password must be at least 6 characters long.'}), 400
         if StudentModel.get_by_roll_no(roll_no):
-            flash(f'Roll Number "{roll_no}" is already registered.', 'danger')
-            return render_template('auth/register.html')
+            return jsonify({'status': 'error', 'message': f'Roll Number "{roll_no}" is already registered.'}), 400
 
-        # Create user account
         user, err = User.create(name, email, password, role='student')
         if err:
-            flash(err, 'danger')
-            return render_template('auth/register.html')
+            return jsonify({'status': 'error', 'message': err}), 400
 
         # Create student profile with real initial zeros
         student = StudentModel.create(
@@ -111,10 +101,9 @@ def register():
         ActivityModel.log('registration', f'New Student Registered', f'{name} ({roll_no}) joined {department}', student_id=student['_id'])
 
         login_user(user)
-        flash('Account registered successfully! Welcome to NEXUS Student Portal.', 'success')
-        return redirect(url_for('student.dashboard'))
+        return jsonify({'status': 'success', 'message': 'Account registered successfully!'})
 
-    return render_template('auth/register.html')
+    return jsonify({'authenticated': False})
 
 @auth_bp.route('/logout')
 def logout():
