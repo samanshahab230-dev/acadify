@@ -17,6 +17,7 @@ def create_app():
         "http://127.0.0.1:3000",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "https://acadify-nu-dusky.vercel.app",
         os.environ.get('FRONTEND_URL', ''),
     ]
     CORS(app, supports_credentials=True, origins=[o for o in allowed_origins if o])
