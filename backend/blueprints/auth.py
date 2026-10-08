@@ -2,7 +2,6 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_user, logout_user, login_required, current_user
 from models.user import User
 from models.student import StudentModel
-from ml.predictor import predict_student_risk
 from models.prediction import PredictionModel
 import secrets, datetime
 from models.db import get_db
