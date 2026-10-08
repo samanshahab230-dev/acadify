@@ -16,6 +16,16 @@ def session_info():
         'role': current_user.role,
     }})
 
+@main_bp.route('/debug/db')
+def debug_db():
+    try:
+        from models.db import get_db
+        db = get_db()
+        count = db.users.count_documents({})
+        return jsonify({'status': 'ok', 'users': count})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @main_bp.route('/')
 def index():
     return jsonify({'status': 'Acadify API is running'})
