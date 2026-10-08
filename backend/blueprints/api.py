@@ -6,7 +6,6 @@ from models.department import DepartmentModel
 from models.student import StudentModel
 from models.prediction import PredictionModel
 from models.notification import NotificationModel
-from ml.predictor import predict_student_risk, get_model_info
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -41,7 +40,11 @@ def dashboard_stats():
         'Below 2.5 (At Risk)':  db.students.count_documents({'gpa': {'$lt': 2.5}})
     }
 
-    model_info = get_model_info()
+    try:
+        from ml.predictor import get_model_info
+        model_info = get_model_info()
+    except Exception:
+        model_info = {'accuracy': 0, 'version': 'N/A', 'features': 0, 'name': 'N/A', 'created': 'N/A', 'macro_f1': 0, 'gpa_rmse': 0, 'gpa_r2': 0, 'risk_levels': []}
 
     return jsonify({
         'status': 'success',
@@ -77,6 +80,7 @@ def dashboard_stats():
 def ai_model_status():
     models = {}
     try:
+        from ml.predictor import get_model_info
         model_info = get_model_info()
         models['student_risk'] = {
             'ready': True,
@@ -131,6 +135,7 @@ def predict_form():
         'quiz_score_std':            float(data.get('quiz_score_std', 10)),
     }
 
+    from ml.predictor import predict_student_risk
     pred = predict_student_risk(feature_data)
 
     # Save to DB if student_id provided
@@ -187,6 +192,7 @@ def run_prediction(student_id):
         if not own or str(own['_id']) != student_id:
             return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
 
+    from ml.predictor import predict_student_risk
     pred = predict_student_risk(student)
 
     PredictionModel.create(

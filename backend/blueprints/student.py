@@ -14,7 +14,6 @@ from models.notes import NotesModel
 from models.marks import MarksModel
 from models.alert import AlertModel
 from models.report import ReportModel
-from ml.predictor import predict_student_risk
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 import os
