@@ -15,6 +15,7 @@ from models.intervention import InterventionModel
 from models.marks import MarksModel
 from models.alert import AlertModel
 from models.report import ReportModel
+from ml.predictor import predict_student_risk
 from models.db import get_db
 import pandas as pd
 import datetime
@@ -150,7 +151,6 @@ def student_add():
             'semester': int(semester),
             'department': department
         }
-        from ml.predictor import predict_student_risk
         pred = predict_student_risk(student_data)
 
         student = StudentModel.create(
@@ -209,7 +209,6 @@ def student_edit(id):
             'semester': semester,
             'department': department
         }
-        from ml.predictor import predict_student_risk
         pred = predict_student_risk(student_data)
 
         # Update Student Record
@@ -428,7 +427,6 @@ def data_upload():
                     continue
 
                 student_data = {'gpa': gpa, 'attendance_pct': attendance_pct, 'semester': semester, 'department': department}
-                from ml.predictor import predict_student_risk
                 pred = predict_student_risk(student_data)
 
                 student = StudentModel.create(

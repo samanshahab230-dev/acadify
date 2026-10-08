@@ -16,29 +16,38 @@ def session_info():
         'role': current_user.role,
     }})
 
-@main_bp.route('/debug/db')
-def debug_db():
-    try:
-        from models.db import get_db
-        db = get_db()
-        count = db.users.count_documents({})
-        return jsonify({'status': 'ok', 'users': count})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
 @main_bp.route('/')
 def index():
-    return jsonify({'status': 'Acadify API is running'})
+    sample_prediction = {
+        'model_version': 'NEXUS-ML-v1.0',
+        'predicted_at': datetime.datetime.now(datetime.timezone.utc),
+        'risk_score': 12.4,
+        'confidence': 94.8,
+        'performance_forecast': {
+            'grade_tier': 'A- / Projected'
+        },
+        'recommendations': [
+            'Maintain current academic velocity; eligible for Advanced Research Honors.',
+            'Recommended enrollment in Quantum Information Systems II.'
+        ]
+    }
+    return render_template('index.html', prediction=sample_prediction)
 
 @main_bp.route('/about')
 def about():
-    return jsonify({'status': 'ok'})
+    return render_template('about.html')
 
 @main_bp.route('/contact', methods=['GET', 'POST'])
 def contact():
-    return jsonify({'status': 'ok'})
+    if request.method == 'POST':
+        name = request.form.get('name')
+        email = request.form.get('email')
+        message = request.form.get('message')
+        flash('Thank you for contacting EDU Intelligence Administration. Our team will get back to you shortly.', 'success')
+        return redirect(url_for('main.contact'))
+    return render_template('contact.html')
 
 @main_bp.route('/research')
 def research():
-    return jsonify({'status': 'ok'})
+    return render_template('research.html')
 
