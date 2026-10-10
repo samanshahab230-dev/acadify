@@ -1,0 +1,9 @@
+.env
+__pycache__
+*.pyc
+*.pyo
+.git
+*.h5
+*.keras
+*.pkl
+*.npy
