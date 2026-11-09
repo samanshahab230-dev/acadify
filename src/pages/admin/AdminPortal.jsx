@@ -658,15 +658,14 @@ function StudentForm({ data, isEdit, pathname, submit }) {
       {!isEdit && <Input label="Email address" name="email" type="email" required />}
       {!isEdit && <Input label="Roll number" name="roll_no" required />}
 
-      {/* Department — datalist for free-text + suggestions */}
+      {/* Department — proper dropdown */}
       <label className="block space-y-2 text-sm font-medium text-gray-700">
         Department
-        <input className="glass-input" name="department" required list="dept-list"
-          placeholder="Type or select department"
-          value={selDept} onChange={e => { setSelDept(e.target.value); setSelClass(''); setSelCourse(''); }} />
-        <datalist id="dept-list">
-          {allDepts.map(d => <option key={d} value={d} />)}
-        </datalist>
+        <select className="glass-input" name="department" required value={selDept}
+          onChange={e => { setSelDept(e.target.value); setSelClass(''); setSelCourse(''); }}>
+          <option value="">Select department</option>
+          {allDepts.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
       </label>
 
       {/* Class — dropdown from existing classes in this dept */}
