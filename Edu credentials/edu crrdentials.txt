@@ -36,3 +36,15 @@ password maazkhan
   - [maya.lin@nexus.edu](mailto:maya.lin@nexus.edu) / Student123!
   - [oliver.q@nexus.edu](mailto:oliver.q@nexus.edu) / Student123!
 
+------------------------------------------------------------------------------------------------------------------
+backend deploy: ngrok
+ngrok account: sk3384069@gmail.com and also this account authtoken used in backend
+command:
+terminal 1:
+cd "C:\Users\dell\OneDrive\Desktop\EDU" ngrok http --domain=accuracy-campus-shone.ngrok-free.dev 5000
+terminal 2:
+PS C:\Users\dell\OneDrive\Desktop\EDU\backend> py app.py
+
+frontend deploy: vercel 
+github login samanshahab230-dev
+https://acadify-his-fb1f.vercel.app/

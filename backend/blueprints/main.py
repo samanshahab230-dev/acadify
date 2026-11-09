@@ -18,20 +18,7 @@ def session_info():
 
 @main_bp.route('/')
 def index():
-    sample_prediction = {
-        'model_version': 'NEXUS-ML-v1.0',
-        'predicted_at': datetime.datetime.now(datetime.timezone.utc),
-        'risk_score': 12.4,
-        'confidence': 94.8,
-        'performance_forecast': {
-            'grade_tier': 'A- / Projected'
-        },
-        'recommendations': [
-            'Maintain current academic velocity; eligible for Advanced Research Honors.',
-            'Recommended enrollment in Quantum Information Systems II.'
-        ]
-    }
-    return render_template('index.html', prediction=sample_prediction)
+    return jsonify({'status': 'Acadify API is running'})
 
 @main_bp.route('/about')
 def about():

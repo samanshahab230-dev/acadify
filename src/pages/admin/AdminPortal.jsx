@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Activity, Bell, Building2, ClipboardList, Database, FileText, HandHeart, MessageSquare, Plus, RefreshCw, Search, ShieldAlert, Users } from 'lucide-react';
+import { Activity, Bell, Building2, ClipboardList, Database, FileText, HandHeart, MessageSquare, Plus, RefreshCw, Search, ShieldAlert, Users, BookOpen, ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import api from '../../services/api';
 import { Skeleton, SkeletonCard } from '../../components/Skeleton';
 
@@ -188,7 +188,7 @@ export default function AdminPortal() {
 
   const renderInterventions = () => <div className="space-y-5"><form className="grid gap-3 sm:grid-cols-4" onSubmit={(event) => { event.preventDefault(); submit('/admin/interventions/add', Object.fromEntries(new FormData(event.currentTarget)), 'Intervention logged.'); event.currentTarget.reset(); }}><Select label="High-risk student" name="student_id" required><option value="">Choose student</option>{(data?.students || []).map((student) => <option key={student._id} value={student._id}>{student.name} · {student.roll_no}</option>)}</Select><Select label="Type" name="intervention_type"><option value="counseling">Counseling</option><option value="academic">Academic support</option><option value="attendance">Attendance</option><option value="other">Other</option></Select><Input label="Notes" name="notes" required /><button className="glass-button self-end bg-white px-4 py-3 text-black">Log intervention</button></form><Table headers={['Student', 'Type', 'Notes', 'Status', 'Update']} rows={(data?.interventions || []).map((item) => [item.student_name || 'Student', item.intervention_type, item.notes, item.status, <Select key={`status-${item._id}`} label="" value={item.status} onChange={(event) => submit(`/admin/interventions/${item._id}/status`, { status: event.target.value }, 'Intervention updated.')}><option value="active">Active</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></Select>])} /></div>;
 
-  const renderDepartments = () => <div className="space-y-5"><form className="flex max-w-xl gap-3" onSubmit={(event) => { event.preventDefault(); submit('/admin/departments/add', Object.fromEntries(new FormData(event.currentTarget)), 'Department created.'); event.currentTarget.reset(); }}><input className="glass-input" name="name" placeholder="Department name" required /><button className="glass-button inline-flex items-center gap-2 bg-white px-4 text-black"><Plus className="h-4 w-4" />Add</button></form><Table headers={['Department', 'Students', 'Average GPA', 'Attendance']} rows={(data?.departments || []).map((item) => [item.name, item.total_students, Number(item.avg_gpa || 0).toFixed(2), `${Number(item.avg_attendance || 0).toFixed(1)}%`])} /></div>;
+  const renderDepartments = () => <DepartmentsPanel data={data} submit={submit} />;
 
   const renderUpload = () => <form className="max-w-2xl space-y-4" onSubmit={async (event) => { event.preventDefault(); if (!file) return; const payload = new FormData(); payload.append('csv_file', file); try { const { data: result } = await api.post('/admin/data-upload', payload, { headers: { 'Content-Type': 'multipart/form-data' } }); setNotice(result?._flashes?.map((flash) => flash[1]).join(' ') || 'Import finished.'); } catch (err) { setNotice(err.response?.data?.message || 'CSV import failed.'); } }}><p className="text-sm text-gray-600">Required columns: name, email, roll_no, department, semester, gpa, attendance_pct.</p><input type="file" accept=".csv,text/csv" onChange={(event) => setFile(event.target.files?.[0] || null)} className="block w-full text-sm text-gray-600 file:mr-4 file:border-0 file:bg-white file:px-4 file:py-2 file:text-black" /><button className="glass-button bg-white px-5 py-3 text-black">Import CSV</button>{notice ? <p role="status" className="text-sm text-emerald-600 font-medium">{notice}</p> : null}</form>;
 
@@ -620,6 +620,303 @@ function SettingsPanel() {
         {saved && <span className="text-sm font-medium text-emerald-600">Settings saved successfully.</span>}
       </div>
     </form>
+  );
+}
+
+function DepartmentsPanel({ data, submit }) {
+  const [expandedDept, setExpandedDept] = useState(null);
+  const [courses, setCourses] = useState([]);
+  const [loadingCourses, setLoadingCourses] = useState(false);
+  const [activeCourse, setActiveCourse] = useState(null);
+  const [courseTab, setCourseTab] = useState('students'); // students | marks | attendance
+  const [courseStudents, setCourseStudents] = useState([]);
+  const [courseMarks, setCourseMarks] = useState([]);
+  const [courseAttendance, setCourseAttendance] = useState([]);
+  const [allStudents, setAllStudents] = useState([]);
+  const [teachers, setTeachers] = useState([]);
+  const [msg, setMsg] = useState('');
+  const [courseForm, setCourseForm] = useState({ class_name: '', subject: '', teacher_id: '' });
+  const [marksForm, setMarksForm] = useState({ student_id: '', mid_marks: '', final_marks: '', total_marks: '100', obtained_marks: '' });
+  const [attForm, setAttForm] = useState({ student_id: '', date: new Date().toISOString().slice(0, 10), status: 'present' });
+
+  const loadCourses = async (dept) => {
+    setLoadingCourses(true);
+    try {
+      const { data: res } = await api.get(`/admin/api/courses?department=${encodeURIComponent(dept)}`);
+      setCourses(res.courses || []);
+    } catch { setCourses([]); }
+    setLoadingCourses(false);
+  };
+
+  const loadCourseDetail = async (course) => {
+    setActiveCourse(course);
+    setCourseTab('students');
+    const [s, m, a] = await Promise.all([
+      api.get(`/admin/api/courses/${course._id}/students`).then(r => r.data.students || []).catch(() => []),
+      api.get(`/admin/api/courses/${course._id}/marks`).then(r => r.data.marks || []).catch(() => []),
+      api.get(`/admin/api/courses/${course._id}/attendance`).then(r => r.data.attendance || []).catch(() => []),
+    ]);
+    setCourseStudents(s);
+    setCourseMarks(m);
+    setCourseAttendance(a);
+  };
+
+  const toggleDept = async (dept) => {
+    if (expandedDept === dept) { setExpandedDept(null); setActiveCourse(null); return; }
+    setExpandedDept(dept);
+    setActiveCourse(null);
+    // load teachers & all students once
+    if (!teachers.length) {
+      const { data: ud } = await api.get('/admin/users').catch(() => ({ data: { users: [] } }));
+      setTeachers((ud.users || []).filter(u => u.role === 'teacher'));
+      setAllStudents(ud.students || []);
+    }
+    await loadCourses(dept);
+  };
+
+  const createCourse = async (e) => {
+    e.preventDefault();
+    setMsg('');
+    try {
+      await api.post('/admin/api/courses', { ...courseForm, department: expandedDept });
+      setMsg('Course created.');
+      setCourseForm({ class_name: '', subject: '', teacher_id: '' });
+      await loadCourses(expandedDept);
+    } catch (err) { setMsg(err.response?.data?.message || 'Failed.'); }
+  };
+
+  const deleteCourse = async (courseId) => {
+    if (!window.confirm('Delete this course and all its data?')) return;
+    await api.post(`/admin/api/courses/${courseId}`);
+    setActiveCourse(null);
+    await loadCourses(expandedDept);
+  };
+
+  const enrollStudents = async (studentId, action) => {
+    await api.post(`/admin/api/courses/${activeCourse._id}/enroll`, { student_ids: [studentId], action });
+    const { data: res } = await api.get(`/admin/api/courses/${activeCourse._id}/students`);
+    setCourseStudents(res.students || []);
+    setMsg(action === 'enroll' ? 'Student enrolled.' : 'Student removed.');
+  };
+
+  const saveMarks = async (e) => {
+    e.preventDefault();
+    setMsg('');
+    try {
+      await api.post(`/admin/api/courses/${activeCourse._id}/marks`, marksForm);
+      setMsg('Marks saved.');
+      const { data: res } = await api.get(`/admin/api/courses/${activeCourse._id}/marks`);
+      setCourseMarks(res.marks || []);
+      setMarksForm({ student_id: '', mid_marks: '', final_marks: '', total_marks: '100', obtained_marks: '' });
+    } catch (err) { setMsg(err.response?.data?.message || 'Failed.'); }
+  };
+
+  const markAttendance = async (e) => {
+    e.preventDefault();
+    setMsg('');
+    try {
+      await api.post(`/admin/api/courses/${activeCourse._id}/attendance`, attForm);
+      setMsg('Attendance marked.');
+      const { data: res } = await api.get(`/admin/api/courses/${activeCourse._id}/attendance`);
+      setCourseAttendance(res.attendance || []);
+    } catch (err) { setMsg(err.response?.data?.message || 'Failed.'); }
+  };
+
+  const deptStudents = allStudents.filter(s => s.department === expandedDept);
+  const enrolledIds = new Set(courseStudents.map(s => s._id));
+
+  return (
+    <div className="space-y-5">
+      {/* Add Department */}
+      <form className="flex max-w-xl gap-3" onSubmit={(e) => { e.preventDefault(); submit('/admin/departments/add', Object.fromEntries(new FormData(e.currentTarget)), 'Department created.'); e.currentTarget.reset(); }}>
+        <input className="glass-input" name="name" placeholder="Department name" required />
+        <button className="glass-button inline-flex items-center gap-2 bg-white px-4 text-black"><Plus className="h-4 w-4" />Add Dept</button>
+      </form>
+
+      {/* Departments List */}
+      {(data?.departments || []).map(dept => (
+        <div key={dept.name} className="border border-white/10 rounded-xl overflow-hidden">
+          {/* Dept Header */}
+          <button onClick={() => toggleDept(dept.name)}
+            className="w-full flex items-center justify-between px-5 py-4 bg-white/5 hover:bg-white/10 transition-colors text-left">
+            <div className="flex items-center gap-3">
+              <Building2 className="h-5 w-5 text-indigo-400" />
+              <div>
+                <span className="font-semibold text-gray-900">{dept.name}</span>
+                <span className="ml-3 text-sm text-gray-500">{dept.total_students} students · GPA {Number(dept.avg_gpa || 0).toFixed(2)} · Att {Number(dept.avg_attendance || 0).toFixed(1)}%</span>
+              </div>
+            </div>
+            {expandedDept === dept.name ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
+          </button>
+
+          {expandedDept === dept.name && (
+            <div className="p-5 space-y-5 border-t border-white/10">
+              {msg && <p className="text-sm text-emerald-600 font-medium">{msg}</p>}
+
+              {/* Add Course Form */}
+              <form onSubmit={createCourse} className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <input className="glass-input" placeholder="Class (e.g. Class 9)" value={courseForm.class_name}
+                  onChange={e => setCourseForm({ ...courseForm, class_name: e.target.value })} required />
+                <input className="glass-input" placeholder="Subject (e.g. Mathematics)" value={courseForm.subject}
+                  onChange={e => setCourseForm({ ...courseForm, subject: e.target.value })} required />
+                <select className="glass-input" value={courseForm.teacher_id}
+                  onChange={e => setCourseForm({ ...courseForm, teacher_id: e.target.value })}>
+                  <option value="">Assign Teacher (optional)</option>
+                  {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+                <button className="glass-button bg-white text-black px-4 py-2 text-sm inline-flex items-center gap-2">
+                  <BookOpen className="h-4 w-4" />Add Course
+                </button>
+              </form>
+
+              {/* Courses Grid */}
+              {loadingCourses ? <p className="text-sm text-gray-400">Loading courses...</p> : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {courses.length === 0 && <p className="text-sm text-gray-400 col-span-full">No courses yet. Add one above.</p>}
+                  {courses.map(course => (
+                    <div key={course._id}
+                      className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                        activeCourse?._id === course._id ? 'border-indigo-400 bg-indigo-50/10' : 'border-white/10 hover:border-white/30'
+                      }`}
+                      onClick={() => loadCourseDetail(course)}>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-semibold text-sm">{course.class_name}</p>
+                          <p className="text-indigo-400 text-sm">{course.subject}</p>
+                          <p className="text-xs text-gray-400 mt-1">{course.teacher_name || 'No teacher'} · {course.enrolled_count} students</p>
+                        </div>
+                        <button onClick={e => { e.stopPropagation(); deleteCourse(course._id); }}
+                          className="text-red-400 hover:text-red-600 p-1">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Course Detail Panel */}
+              {activeCourse && (
+                <div className="border border-white/20 rounded-xl p-5 space-y-4 bg-white/5">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">{activeCourse.class_name} — {activeCourse.subject}</h3>
+                    <div className="flex gap-2">
+                      {['students', 'marks', 'attendance'].map(t => (
+                        <button key={t} onClick={() => setCourseTab(t)}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-lg capitalize transition-colors ${
+                            courseTab === t ? 'bg-indigo-500 text-white' : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                          }`}>{t}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Students Tab */}
+                  {courseTab === 'students' && (
+                    <div className="space-y-3">
+                      <p className="text-xs text-gray-400 uppercase">Enrolled Students ({courseStudents.length})</p>
+                      <Table
+                        headers={['Name', 'Roll No', 'Action']}
+                        rows={courseStudents.map(s => [
+                          s.name, s.roll_no,
+                          <button key={s._id} onClick={() => enrollStudents(s._id, 'unenroll')}
+                            className="text-red-400 text-xs hover:underline">Remove</button>
+                        ])}
+                      />
+                      <details className="mt-2">
+                        <summary className="text-sm text-indigo-400 cursor-pointer">+ Enroll more students from {dept.name}</summary>
+                        <div className="mt-2 space-y-1 max-h-48 overflow-y-auto border border-white/10 rounded-lg p-3">
+                          {deptStudents.filter(s => !enrolledIds.has(s._id)).map(s => (
+                            <div key={s._id} className="flex justify-between items-center text-sm py-1">
+                              <span>{s.name} · {s.roll_no}</span>
+                              <button onClick={() => enrollStudents(s._id, 'enroll')}
+                                className="text-indigo-400 text-xs hover:underline">Enroll</button>
+                            </div>
+                          ))}
+                          {deptStudents.filter(s => !enrolledIds.has(s._id)).length === 0 &&
+                            <p className="text-xs text-gray-400">All department students enrolled.</p>}
+                        </div>
+                      </details>
+                    </div>
+                  )}
+
+                  {/* Marks Tab */}
+                  {courseTab === 'marks' && (
+                    <div className="space-y-4">
+                      <form onSubmit={saveMarks} className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <select className="glass-input col-span-2 sm:col-span-1" value={marksForm.student_id}
+                          onChange={e => setMarksForm({ ...marksForm, student_id: e.target.value })} required>
+                          <option value="">Select Student</option>
+                          {courseStudents.map(s => <option key={s._id} value={s._id}>{s.name} · {s.roll_no}</option>)}
+                        </select>
+                        <input className="glass-input" type="number" placeholder="Mid Marks" value={marksForm.mid_marks}
+                          onChange={e => setMarksForm({ ...marksForm, mid_marks: e.target.value })} required />
+                        <input className="glass-input" type="number" placeholder="Final Marks" value={marksForm.final_marks}
+                          onChange={e => setMarksForm({ ...marksForm, final_marks: e.target.value })} required />
+                        <input className="glass-input" type="number" placeholder="Total Marks" value={marksForm.total_marks}
+                          onChange={e => setMarksForm({ ...marksForm, total_marks: e.target.value })} required />
+                        <input className="glass-input" type="number" placeholder="Obtained Marks" value={marksForm.obtained_marks}
+                          onChange={e => setMarksForm({ ...marksForm, obtained_marks: e.target.value })} required />
+                        <button className="glass-button bg-white text-black px-4 py-2 text-sm">Save Marks</button>
+                      </form>
+                      <Table
+                        headers={['Student', 'Roll No', 'Mid', 'Final', 'Obtained', 'Total', '%', 'Grade']}
+                        rows={courseMarks.map(m => [
+                          m.student_name, m.roll_no,
+                          m.mid_marks, m.final_marks,
+                          m.obtained_marks, m.total_marks,
+                          `${m.percentage}%`,
+                          <span key={m._id} className={`font-bold ${
+                            m.grade?.startsWith('A') ? 'text-emerald-500' :
+                            m.grade?.startsWith('B') ? 'text-blue-400' :
+                            m.grade?.startsWith('C') ? 'text-yellow-400' :
+                            m.grade === 'F' ? 'text-red-500' : 'text-gray-300'
+                          }`}>{m.grade}</span>
+                        ])}
+                      />
+                      {courseMarks.length === 0 && <p className="text-sm text-gray-400">No marks entered yet.</p>}
+                    </div>
+                  )}
+
+                  {/* Attendance Tab */}
+                  {courseTab === 'attendance' && (
+                    <div className="space-y-4">
+                      <form onSubmit={markAttendance} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <select className="glass-input" value={attForm.student_id}
+                          onChange={e => setAttForm({ ...attForm, student_id: e.target.value })} required>
+                          <option value="">Select Student</option>
+                          {courseStudents.map(s => <option key={s._id} value={s._id}>{s.name} · {s.roll_no}</option>)}
+                        </select>
+                        <input type="date" className="glass-input" value={attForm.date}
+                          onChange={e => setAttForm({ ...attForm, date: e.target.value })} required />
+                        <select className="glass-input" value={attForm.status}
+                          onChange={e => setAttForm({ ...attForm, status: e.target.value })}>
+                          <option value="present">Present</option>
+                          <option value="absent">Absent</option>
+                        </select>
+                        <button className="glass-button bg-white text-black px-4 py-2 text-sm">Mark</button>
+                      </form>
+                      <Table
+                        headers={['Student', 'Roll No', 'Present', 'Absent', 'Total', 'Attendance %']}
+                        rows={courseAttendance.map(a => [
+                          a.student_name, a.roll_no,
+                          <span key={`p-${a.student_id}`} className="text-emerald-400">{a.present}</span>,
+                          <span key={`ab-${a.student_id}`} className="text-red-400">{a.absent}</span>,
+                          a.total,
+                          <span key={`pct-${a.student_id}`} className={a.percentage < 75 ? 'text-red-400 font-semibold' : 'text-emerald-400'}>
+                            {a.percentage}%
+                          </span>
+                        ])}
+                      />
+                      {courseAttendance.length === 0 && <p className="text-sm text-gray-400">No attendance records yet.</p>}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 

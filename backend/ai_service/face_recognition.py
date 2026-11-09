@@ -7,6 +7,7 @@ Uses:
 """
 import os
 import threading
+import numpy as np
 
 # Lower = stricter match. Cosine distance range: 0 (identical) -> 1 (opposite)
 FACE_MATCH_THRESHOLD = float(os.environ.get('FACE_MATCH_THRESHOLD', '0.40'))

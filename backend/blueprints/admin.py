@@ -15,6 +15,7 @@ from models.intervention import InterventionModel
 from models.marks import MarksModel
 from models.alert import AlertModel
 from models.report import ReportModel
+from models.course import CourseModel
 from ml.predictor import predict_student_risk
 from models.db import get_db
 import pandas as pd
@@ -1060,6 +1061,112 @@ def student_marks(student_id):
         } for m in marks],
         'analytics': analytics
     })
+
+
+# ─── COURSES MANAGEMENT ──────────────────────────────────────────────────────
+
+@admin_bp.route('/api/courses', methods=['GET'])
+@login_required
+@role_required('admin')
+def api_courses_list():
+    department = request.args.get('department', '')
+    courses = CourseModel.get_all(department=department or None)
+    return jsonify({'courses': courses})
+
+
+@admin_bp.route('/api/courses', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_course_create():
+    data = request.get_json(silent=True) or request.form
+    department = (data.get('department') or '').strip()
+    class_name = (data.get('class_name') or '').strip()
+    subject = (data.get('subject') or '').strip()
+    teacher_id = (data.get('teacher_id') or '').strip() or None
+    if not department or not class_name or not subject:
+        return jsonify({'success': False, 'message': 'Department, class, and subject are required.'}), 400
+    course = CourseModel.create(department, class_name, subject, teacher_id)
+    return jsonify({'success': True, 'message': 'Course created.', 'course_id': str(course['_id'])}), 201
+
+
+@admin_bp.route('/api/courses/<course_id>', methods=['DELETE', 'POST'])
+@login_required
+@role_required('admin')
+def api_course_delete(course_id):
+    CourseModel.delete(course_id)
+    return jsonify({'success': True, 'message': 'Course deleted.'})
+
+
+@admin_bp.route('/api/courses/<course_id>/enroll', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_course_enroll(course_id):
+    data = request.get_json(silent=True) or {}
+    student_ids = data.get('student_ids', [])
+    action = data.get('action', 'enroll')  # 'enroll' or 'unenroll'
+    for sid in student_ids:
+        if action == 'unenroll':
+            CourseModel.unenroll_student(course_id, sid)
+        else:
+            CourseModel.enroll_student(course_id, sid)
+    return jsonify({'success': True, 'message': f'{len(student_ids)} students updated.'})
+
+
+@admin_bp.route('/api/courses/<course_id>/students')
+@login_required
+@role_required('admin')
+def api_course_students(course_id):
+    students = CourseModel.get_enrolled_students(course_id)
+    return jsonify({'students': students})
+
+
+@admin_bp.route('/api/courses/<course_id>/marks', methods=['GET'])
+@login_required
+@role_required('admin')
+def api_course_marks_get(course_id):
+    marks = CourseModel.get_marks(course_id)
+    return jsonify({'marks': marks})
+
+
+@admin_bp.route('/api/courses/<course_id>/marks', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_course_marks_save(course_id):
+    data = request.get_json(silent=True) or request.form
+    student_id = (data.get('student_id') or '').strip()
+    if not student_id:
+        return jsonify({'success': False, 'message': 'Student ID required.'}), 400
+    try:
+        CourseModel.save_marks(
+            course_id, student_id,
+            data.get('mid_marks', 0), data.get('final_marks', 0),
+            data.get('total_marks', 100), data.get('obtained_marks', 0)
+        )
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+    return jsonify({'success': True, 'message': 'Marks saved.'})
+
+
+@admin_bp.route('/api/courses/<course_id>/attendance', methods=['GET'])
+@login_required
+@role_required('admin')
+def api_course_attendance_get(course_id):
+    attendance = CourseModel.get_attendance(course_id)
+    return jsonify({'attendance': attendance})
+
+
+@admin_bp.route('/api/courses/<course_id>/attendance', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_course_attendance_mark(course_id):
+    data = request.get_json(silent=True) or request.form
+    student_id = (data.get('student_id') or '').strip()
+    date_str = (data.get('date') or '').strip()
+    status = (data.get('status') or 'present').strip()
+    if not student_id or not date_str:
+        return jsonify({'success': False, 'message': 'Student and date required.'}), 400
+    CourseModel.mark_attendance(course_id, student_id, date_str, status)
+    return jsonify({'success': True, 'message': 'Attendance marked.'})
 
 
 @admin_bp.route('/interventions/add', methods=['POST'])
