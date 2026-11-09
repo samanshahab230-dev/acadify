@@ -141,7 +141,8 @@ def api_create_session():
     data = request.get_json(silent=True) or {}
     subject = data.get('subject', '').strip()
     date_str = data.get('date', datetime.date.today().strftime('%Y-%m-%d'))
-    label = data.get('label', '').strip()  # e.g. "Morning", "Lab"
+    label = data.get('label', '').strip()
+    course_id = data.get('course_id', '').strip()
 
     if not subject:
         return jsonify({'success': False, 'message': 'Subject required.'}), 400
@@ -153,14 +154,18 @@ def api_create_session():
 
     day = date_obj.strftime('%A')
 
-    # Count enrolled students
-    enrolled_ids = db.attendance_subjects.distinct('student_id', {'subject': subject})
-    if current_user.role == 'teacher':
-        teacher_students = set(s['_id'] for s in db.students.find({'teacher_ids': current_user._id}, {'_id': 1}))
-        enrolled_ids = [sid for sid in enrolled_ids if sid in teacher_students]
+    # Count enrolled students from course_enrollments if course_id given
+    if course_id:
+        try:
+            enrolled_ids = db.course_enrollments.distinct('student_id', {'course_id': ObjectId(course_id)})
+        except Exception:
+            enrolled_ids = []
+    else:
+        enrolled_ids = db.attendance_subjects.distinct('student_id', {'subject': subject})
 
     session_doc = {
         'subject': subject,
+        'course_id': ObjectId(course_id) if course_id else None,
         'date': date_str,
         'day': day,
         'label': label,
@@ -174,6 +179,7 @@ def api_create_session():
         'success': True,
         'session_id': str(result.inserted_id),
         'subject': subject,
+        'course_id': course_id,
         'date': date_str,
         'day': day,
         'label': label,
@@ -206,49 +212,43 @@ def api_face_subjects():
 @login_required
 @role_required('admin', 'teacher')
 def api_class_students():
-    """Return students enrolled in a subject with their face registration status and session attendance."""
-    import datetime
+    """Return students enrolled in a course with face status and session attendance."""
     db = get_db()
+    course_id = request.args.get('course_id', '').strip()
     subject = request.args.get('subject', '').strip()
     session_id = request.args.get('session_id', '').strip()
-    if not subject:
-        return jsonify({'success': False, 'message': 'Subject required.'}), 400
-
-    student_query = {'teacher_ids': current_user._id} if current_user.role == 'teacher' else {}
-    enrolled_ids = db.attendance_subjects.distinct('student_id', {'subject': subject})
-    if student_query:
-        teacher_students = set(s['_id'] for s in db.students.find(student_query, {'_id': 1}))
-        enrolled_ids = [sid for sid in enrolled_ids if sid in teacher_students]
-
     today = datetime.date.today().strftime('%Y-%m-%d')
+
+    # Get enrolled student_ids
+    if course_id:
+        try:
+            enrolled_ids = db.course_enrollments.distinct('student_id', {'course_id': ObjectId(course_id)})
+        except Exception:
+            enrolled_ids = []
+    elif subject:
+        enrolled_ids = db.attendance_subjects.distinct('student_id', {'subject': subject})
+    else:
+        return jsonify({'success': False, 'message': 'course_id or subject required.'}), 400
+
     result = []
     for sid in enrolled_ids:
         student = db.students.find_one({'_id': sid})
         if not student:
             continue
         user = db.users.find_one({'_id': student.get('user_id')})
-        # Check attendance for this session specifically
-        if session_id:
-            att_record = db.face_attendance.find_one({'student_id': sid, 'session_id': session_id})
-        else:
-            att_record = db.attendance_records.find_one({
-                'student_id': sid, 'subject': subject,
-                'date': {'$gte': datetime.datetime.combine(datetime.date.today(), datetime.time.min),
-                         '$lt': datetime.datetime.combine(datetime.date.today() + datetime.timedelta(days=1), datetime.time.min)}
-            })
-        face_registered = len(student.get('face_embeddings', [])) > 0
+        att_record = db.face_attendance.find_one({'student_id': sid, 'session_id': session_id}) if session_id else None
         result.append({
             '_id': str(sid),
             'name': user.get('name', 'Unknown') if user else 'Unknown',
             'roll_no': student.get('roll_no', ''),
             'department': student.get('department', ''),
-            'face_registered': face_registered,
+            'face_registered': len(student.get('face_embeddings', [])) > 0,
             'embedding_count': len(student.get('face_embeddings', [])),
             'today_status': att_record.get('status') if att_record else None,
             'already_marked': att_record is not None,
         })
     result.sort(key=lambda x: x['name'])
-    return jsonify({'success': True, 'students': result, 'subject': subject, 'date': today})
+    return jsonify({'success': True, 'students': result, 'date': today})
 
 
 @face_bp.route('/face/register')
@@ -627,7 +627,18 @@ def api_expression():
 @role_required('admin')
 def api_face_students():
     db = get_db()
-    students = list(db.students.find({}, {'face_embeddings': 1, 'roll_no': 1, 'user_id': 1}))
+    department = request.args.get('department', '').strip()
+    class_name = request.args.get('class_name', '').strip()
+
+    # Get all course_ids for this dept+class
+    if department and class_name:
+        course_ids = [c['_id'] for c in db.courses.find({'department': department, 'class_name': class_name})]
+        # Get student_ids enrolled in any of these courses
+        enrolled = db.course_enrollments.distinct('student_id', {'course_id': {'$in': course_ids}})
+        students = list(db.students.find({'_id': {'$in': enrolled}}))
+    else:
+        students = list(db.students.find({}))
+
     result = []
     for s in students:
         user = db.users.find_one({'_id': s.get('user_id')})
@@ -638,6 +649,7 @@ def api_face_students():
             'face_registered': len(s.get('face_embeddings', [])) > 0,
             'embedding_count': len(s.get('face_embeddings', []))
         })
+    result.sort(key=lambda x: x['name'])
     return jsonify({'success': True, 'students': result})
 
 
