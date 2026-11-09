@@ -164,19 +164,9 @@ export default function AdminPortal() {
     await submit(`/admin/students/${id}/delete`, {}, 'Student deleted.');
   };
 
-  const renderStudentForm = () => <form className="grid gap-4 md:grid-cols-2" onSubmit={(event) => { event.preventDefault(); submit(isEdit ? pathname : '/admin/students/add', Object.fromEntries(new FormData(event.currentTarget)), isEdit ? 'Student updated.' : 'Student created.'); }}>
-    <Input label="Full name" name="name" required defaultValue={data?.user?.name || data?.student?.name || ''} />
-    {!isEdit ? <Input label="Email address" name="email" type="email" required /> : null}
-    {!isEdit ? <Input label="Roll number" name="roll_no" required /> : null}
-    <Select label="Department" name="department" required defaultValue={data?.student?.department || ''}><option value="">Select department</option>{(data?.departments || []).map((department) => <option key={department._id || department.name} value={department.name}>{department.name}</option>)}</Select>
-    <Select label="Semester" name="semester" defaultValue={String(data?.student?.semester || 1)}>{[1, 2, 3, 4, 5, 6, 7, 8].map((semester) => <option key={semester}>{semester}</option>)}</Select>
-    <Input label="GPA" name="gpa" type="number" min="0" max="4" step="0.01" defaultValue={data?.student?.gpa ?? 3} />
-    <Input label="Attendance (%)" name="attendance_pct" type="number" min="0" max="100" step="0.1" defaultValue={data?.student?.attendance_pct ?? 80} />
-    {!isEdit ? <Input label="Initial password" name="password" type="password" defaultValue="Student123!" /> : null}
-    <div className="flex items-end gap-3"><button className="glass-button bg-white px-5 py-3 text-black">{isEdit ? 'Save changes' : 'Create student'}</button><Link to="/admin/students" className="px-3 py-3 text-sm text-gray-500 hover:text-gray-800">Cancel</Link></div>
-  </form>;
+  const renderStudentForm = () => <StudentForm data={data} isEdit={isEdit} pathname={pathname} submit={submit} />;
 
-  const renderStudents = () => <div className="space-y-5"><form className="flex flex-wrap gap-3" onSubmit={(event) => { event.preventDefault(); navigate(`/admin/students?q=${encodeURIComponent(search)}`); }}><div className="relative min-w-56 flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" /><input className="glass-input pl-10" placeholder="Search roll number or department" value={search} onChange={(event) => setSearch(event.target.value)} /></div><button className="glass-button px-4">Search</button><Link to="/admin/students/add" className="glass-button inline-flex items-center gap-2 bg-white px-4 py-3 text-black"><Plus className="h-4 w-4" />Add student</Link><a href={`${api.defaults.baseURL}/admin/export/csv`} className="glass-button inline-flex items-center px-4 py-3">Export CSV</a></form><Table headers={['Student', 'Roll number', 'Department', 'Semester', 'GPA', 'Attendance', 'Risk', 'Actions']} rows={(data?.students || []).map((student) => [<Link key={`name-${student._id}`} className="font-medium text-indigo-600 hover:text-indigo-800" to={`/admin/students/${student._id}`}>{student.name || 'Student'}</Link>, student.roll_no, student.department, student.semester, Number(student.gpa || 0).toFixed(2), `${Number(student.attendance_pct || 0).toFixed(1)}%`, student.risk_level, <span key={`actions-${student._id}`} className="flex gap-3"><Link to={`/admin/students/${student._id}/edit`} className="text-indigo-600 font-medium hover:underline">Edit</Link><button onClick={() => deleteStudent(student._id)} className="text-red-600 font-medium hover:underline">Delete</button></span>])} />{(data?.students || []).length === 0 ? <Empty>No student records found.</Empty> : null}</div>;
+  const renderStudents = () => <div className="space-y-5"><form className="flex flex-wrap gap-3" onSubmit={(event) => { event.preventDefault(); navigate(`/admin/students?q=${encodeURIComponent(search)}`); }}><div className="relative min-w-56 flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" /><input className="glass-input pl-10" placeholder="Search roll number or department" value={search} onChange={(event) => setSearch(event.target.value)} /></div><button className="glass-button px-4">Search</button><Link to="/admin/students/add" className="glass-button inline-flex items-center gap-2 bg-white px-4 py-3 text-black"><Plus className="h-4 w-4" />Add student</Link><a href={`${api.defaults.baseURL}/admin/export/csv`} className="glass-button inline-flex items-center px-4 py-3">Export CSV</a></form><Table headers={['Student', 'Roll No', 'Department', 'Class', 'Semester', 'GPA', 'Attendance', 'Risk', 'Actions']} rows={(data?.students || []).map((student) => [<Link key={`name-${student._id}`} className="font-medium text-indigo-600 hover:text-indigo-800" to={`/admin/students/${student._id}`}>{student.name || 'Student'}</Link>, student.roll_no, student.department, student.class_name || <span className="text-gray-400 text-xs">—</span>, student.semester, Number(student.gpa || 0).toFixed(2), `${Number(student.attendance_pct || 0).toFixed(1)}%`, student.risk_level, <span key={`actions-${student._id}`} className="flex gap-3"><Link to={`/admin/students/${student._id}/edit`} className="text-indigo-600 font-medium hover:underline">Edit</Link><button onClick={() => deleteStudent(student._id)} className="text-red-600 font-medium hover:underline">Delete</button></span>])} />{(data?.students || []).length === 0 ? <Empty>No student records found.</Empty> : null}</div>;
 
   const renderPredictions = () => <><Select label="Filter by risk" value={new URLSearchParams(window.location.search).get('risk_level') || ''} onChange={(event) => navigate(`/admin/predictions${event.target.value ? `?risk_level=${event.target.value}` : ''}`)}><option value="">All risk levels</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option></Select><Table headers={['Student', 'Risk level', 'Score', 'Confidence', 'Forecast', 'Date', 'Actions']} rows={(data?.predictions || []).map((item) => [item.student_name || item.student?.name || 'Student', item.risk_level, Number(item.risk_score || 0).toFixed(1), `${Number(item.confidence || 0).toFixed(1)}%`, item.performance_forecast?.grade_tier || '—', item.predicted_at || item.created_at || '—', <button key={`delete-${item._id}`} onClick={() => submit(`/admin/predictions/${item._id}/delete`, {}, 'Prediction deleted.')} className="text-red-600 font-medium hover:underline">Delete</button>])} />{!data?.predictions?.length ? <Empty>No prediction records found.</Empty> : null}</>;
 
@@ -623,21 +613,105 @@ function SettingsPanel() {
   );
 }
 
+function StudentForm({ data, isEdit, pathname, submit }) {
+  const [selDept, setSelDept] = useState(data?.student?.department || '');
+  const [courses, setCourses] = useState([]);
+  const [selCourse, setSelCourse] = useState(data?.student?.course_id || '');
+
+  useEffect(() => {
+    if (!selDept) { setCourses([]); setSelCourse(''); return; }
+    api.get(`/admin/api/courses?department=${encodeURIComponent(selDept)}`)
+      .then(r => setCourses(r.data.courses || []))
+      .catch(() => setCourses([]));
+  }, [selDept]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const payload = Object.fromEntries(new FormData(e.currentTarget));
+    if (selCourse) payload.course_id = selCourse;
+    submit(isEdit ? pathname : '/admin/students/add', payload, isEdit ? 'Student updated.' : 'Student created.');
+  };
+
+  // Group courses by class_name for display
+  const coursesByClass = courses.reduce((acc, c) => {
+    if (!acc[c.class_name]) acc[c.class_name] = [];
+    acc[c.class_name].push(c);
+    return acc;
+  }, {});
+
+  return (
+    <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
+      <Input label="Full name" name="name" required defaultValue={data?.user?.name || data?.student?.name || ''} />
+      {!isEdit && <Input label="Email address" name="email" type="email" required />}
+      {!isEdit && <Input label="Roll number" name="roll_no" required />}
+
+      {/* Department */}
+      <label className="block space-y-2 text-sm font-medium text-gray-700">
+        Department
+        <select className="glass-input" name="department" required value={selDept}
+          onChange={e => { setSelDept(e.target.value); setSelCourse(''); }}>
+          <option value="">Select department</option>
+          {(data?.departments || []).map(d => <option key={d._id || d.name} value={d.name}>{d.name}</option>)}
+        </select>
+      </label>
+
+      {/* Course — class wise grouped */}
+      <label className="block space-y-2 text-sm font-medium text-gray-700">
+        Class / Course
+        <select className="glass-input" value={selCourse} onChange={e => setSelCourse(e.target.value)}
+          disabled={!selDept}>
+          <option value="">{selDept ? (courses.length ? 'Select class & course' : 'No courses in this dept') : 'Select department first'}</option>
+          {Object.entries(coursesByClass).map(([cls, cls_courses]) => (
+            <optgroup key={cls} label={cls}>
+              {cls_courses.map(c => <option key={c._id} value={c._id}>{c.subject}{c.teacher_name ? ` — ${c.teacher_name}` : ''}</option>)}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+
+      <Select label="Semester" name="semester" defaultValue={String(data?.student?.semester || 1)}>
+        {[1,2,3,4,5,6,7,8].map(s => <option key={s}>{s}</option>)}
+      </Select>
+      <Input label="GPA" name="gpa" type="number" min="0" max="4" step="0.01" defaultValue={data?.student?.gpa ?? 3} />
+      <Input label="Attendance (%)" name="attendance_pct" type="number" min="0" max="100" step="0.1" defaultValue={data?.student?.attendance_pct ?? 80} />
+      {!isEdit && <Input label="Initial password" name="password" type="password" defaultValue="Student123!" />}
+      <div className="flex items-end gap-3 md:col-span-2">
+        <button className="glass-button bg-white px-5 py-3 text-black">{isEdit ? 'Save changes' : 'Create student'}</button>
+        <Link to="/admin/students" className="px-3 py-3 text-sm text-gray-500 hover:text-gray-800">Cancel</Link>
+      </div>
+    </form>
+  );
+}
+
 function DepartmentsPanel({ data, submit }) {
   const [expandedDept, setExpandedDept] = useState(null);
   const [courses, setCourses] = useState([]);
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [activeCourse, setActiveCourse] = useState(null);
-  const [courseTab, setCourseTab] = useState('students'); // students | marks | attendance
+  const [courseTab, setCourseTab] = useState('students');
   const [courseStudents, setCourseStudents] = useState([]);
   const [courseMarks, setCourseMarks] = useState([]);
   const [courseAttendance, setCourseAttendance] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [msg, setMsg] = useState('');
+  const [depts, setDepts] = useState(data?.departments || []);
   const [courseForm, setCourseForm] = useState({ class_name: '', subject: '', teacher_id: '' });
   const [marksForm, setMarksForm] = useState({ student_id: '', mid_marks: '', final_marks: '', total_marks: '100', obtained_marks: '' });
   const [attForm, setAttForm] = useState({ student_id: '', date: new Date().toISOString().slice(0, 10), status: 'present' });
+
+  // sync depts when data changes
+  useEffect(() => { setDepts(data?.departments || []); }, [data]);
+
+  const deleteDept = async (name) => {
+    if (!window.confirm(`Delete department "${name}"? This will NOT delete students.`)) return;
+    try {
+      await api.post(`/admin/departments/${encodeURIComponent(name)}/delete`);
+      setDepts(prev => prev.filter(d => d.name !== name));
+      if (expandedDept === name) { setExpandedDept(null); setActiveCourse(null); }
+      setMsg(`Department "${name}" deleted.`);
+    } catch (err) { setMsg(err.response?.data?.message || 'Could not delete.'); }
+  };
 
   const loadCourses = async (dept) => {
     setLoadingCourses(true);
@@ -734,20 +808,24 @@ function DepartmentsPanel({ data, submit }) {
       </form>
 
       {/* Departments List */}
-      {(data?.departments || []).map(dept => (
+      {depts.map(dept => (
         <div key={dept.name} className="border border-white/10 rounded-xl overflow-hidden">
           {/* Dept Header */}
-          <button onClick={() => toggleDept(dept.name)}
-            className="w-full flex items-center justify-between px-5 py-4 bg-white/5 hover:bg-white/10 transition-colors text-left">
-            <div className="flex items-center gap-3">
+          <div className="w-full flex items-center justify-between px-5 py-4 bg-white/5">
+            <button onClick={() => toggleDept(dept.name)} className="flex items-center gap-3 flex-1 text-left hover:opacity-80 transition-opacity">
               <Building2 className="h-5 w-5 text-indigo-400" />
               <div>
                 <span className="font-semibold text-gray-900">{dept.name}</span>
                 <span className="ml-3 text-sm text-gray-500">{dept.total_students} students · GPA {Number(dept.avg_gpa || 0).toFixed(2)} · Att {Number(dept.avg_attendance || 0).toFixed(1)}%</span>
               </div>
+            </button>
+            <div className="flex items-center gap-2">
+              {expandedDept === dept.name ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
+              <button onClick={() => deleteDept(dept.name)} className="ml-2 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50/10 rounded transition-colors" title="Delete department">
+                <Trash2 className="h-4 w-4" />
+              </button>
             </div>
-            {expandedDept === dept.name ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
-          </button>
+          </div>
 
           {expandedDept === dept.name && (
             <div className="p-5 space-y-5 border-t border-white/10">

@@ -114,6 +114,12 @@ def students():
         ]
 
     student_list = StudentModel.get_all(query=mongo_query, limit=100)
+    # attach class_name from students collection
+    db = get_db()
+    for s in student_list:
+        if not s.get('class_name') and s.get('course_id'):
+            course = db.courses.find_one({'_id': s['course_id']})
+            s['class_name'] = course.get('class_name', '') if course else ''
     departments = DepartmentModel.get_all()
     
     return render_template('admin/students.html', 
@@ -165,6 +171,20 @@ def student_add():
             risk_score=pred['risk_score'],
             last_prediction=pred
         )
+
+        # Enroll in course if selected
+        course_id = request.form.get('course_id', '').strip()
+        if course_id:
+            try:
+                course = get_db().courses.find_one({'_id': ObjectId(course_id)})
+                if course:
+                    CourseModel.enroll_student(course_id, student['_id'])
+                    get_db().students.update_one(
+                        {'_id': student['_id']},
+                        {'$set': {'course_id': ObjectId(course_id), 'class_name': course.get('class_name', '')}}
+                    )
+            except Exception:
+                pass
 
         PredictionModel.create(
             student_id=student['_id'],
@@ -250,9 +270,23 @@ def student_edit(id):
                 notif_type="warning"
             )
 
+        # Update course enrollment if course_id changed
+        new_course_id = request.form.get('course_id', '').strip()
+        if new_course_id:
+            try:
+                db_conn = get_db()
+                course = db_conn.courses.find_one({'_id': ObjectId(new_course_id)})
+                if course:
+                    # unenroll from old course
+                    old_cid = student.get('course_id')
+                    if old_cid:
+                        CourseModel.unenroll_student(str(old_cid), student['_id'])
+                    CourseModel.enroll_student(new_course_id, student['_id'])
+                    StudentModel.update(id, {'course_id': ObjectId(new_course_id), 'class_name': course.get('class_name', '')})
+            except Exception:
+                pass
+
         DepartmentModel.recalculate_stats()
-        flash(f'Student record for {student["roll_no"]} updated and re-evaluated by NEXUS AI.', 'success')
-        return redirect(url_for('admin.students'))
 
     return render_template('admin/student_edit.html', student=student, user=user, departments=DepartmentModel.get_all())
 
@@ -345,6 +379,16 @@ def department_add():
             flash(f'Department "{name}" created successfully.', 'success')
             return redirect(url_for('admin.departments'))
     return render_template('admin/department_add.html')
+
+
+@admin_bp.route('/departments/<name>/delete', methods=['POST'])
+@login_required
+@role_required('admin')
+def department_delete(name):
+    db = get_db()
+    db.departments.delete_one({'name': name})
+    AuditLogModel.log_action(current_user.name, 'DEPARTMENT_DELETED', f'Deleted department: {name}')
+    return jsonify({'success': True, 'message': f'Department "{name}" deleted.'})
 
 @admin_bp.route('/predict', methods=['GET'])
 @login_required
