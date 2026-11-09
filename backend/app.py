@@ -12,15 +12,7 @@ react_api.apply_patches()
 
 def create_app():
     app = Flask(__name__)
-    allowed_origins = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "https://acadify-nu-dusky.vercel.app",
-        os.environ.get('FRONTEND_URL', ''),
-    ]
-    CORS(app, supports_credentials=True, origins=[o for o in allowed_origins if o])
+    CORS(app, supports_credentials=True, origins=["https://acadify-his-fb1f.vercel.app", "https://acadify-nu-dusky.vercel.app", "http://localhost:5173", "http://127.0.0.1:5173"])
     app.config.from_object(Config)
 
     # Initialize PyMongo
