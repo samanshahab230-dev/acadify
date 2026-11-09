@@ -114,12 +114,14 @@ def students():
         ]
 
     student_list = StudentModel.get_all(query=mongo_query, limit=100)
-    # attach class_name from students collection
+    # attach class_name and course_subject from courses collection
     db = get_db()
     for s in student_list:
-        if not s.get('class_name') and s.get('course_id'):
+        if s.get('course_id'):
             course = db.courses.find_one({'_id': s['course_id']})
-            s['class_name'] = course.get('class_name', '') if course else ''
+            if course:
+                s['class_name'] = course.get('class_name', '')
+                s['course_subject'] = course.get('subject', '')
     departments = DepartmentModel.get_all()
     
     return render_template('admin/students.html', 

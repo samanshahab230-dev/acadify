@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Activity, Bell, Building2, ClipboardList, Database, FileText, HandHeart, MessageSquare, Plus, RefreshCw, Search, ShieldAlert, Users, BookOpen, ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
+import { Activity, Bell, Building2, ClipboardList, Database, FileText, HandHeart, MessageSquare, Plus, RefreshCw, Search, ShieldAlert, Users, BookOpen, ChevronDown, ChevronRight, Trash2, Eye, EyeOff } from 'lucide-react';
 import api from '../../services/api';
 import { Skeleton, SkeletonCard } from '../../components/Skeleton';
 
@@ -166,7 +166,7 @@ export default function AdminPortal() {
 
   const renderStudentForm = () => <StudentForm data={data} isEdit={isEdit} pathname={pathname} submit={submit} />;
 
-  const renderStudents = () => <div className="space-y-5"><form className="flex flex-wrap gap-3" onSubmit={(event) => { event.preventDefault(); navigate(`/admin/students?q=${encodeURIComponent(search)}`); }}><div className="relative min-w-56 flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" /><input className="glass-input pl-10" placeholder="Search roll number or department" value={search} onChange={(event) => setSearch(event.target.value)} /></div><button className="glass-button px-4">Search</button><Link to="/admin/students/add" className="glass-button inline-flex items-center gap-2 bg-white px-4 py-3 text-black"><Plus className="h-4 w-4" />Add student</Link><a href={`${api.defaults.baseURL}/admin/export/csv`} className="glass-button inline-flex items-center px-4 py-3">Export CSV</a></form><Table headers={['Student', 'Roll No', 'Department', 'Class', 'Semester', 'GPA', 'Attendance', 'Risk', 'Actions']} rows={(data?.students || []).map((student) => [<Link key={`name-${student._id}`} className="font-medium text-indigo-600 hover:text-indigo-800" to={`/admin/students/${student._id}`}>{student.name || 'Student'}</Link>, student.roll_no, student.department, student.class_name || <span className="text-gray-400 text-xs">—</span>, student.semester, Number(student.gpa || 0).toFixed(2), `${Number(student.attendance_pct || 0).toFixed(1)}%`, student.risk_level, <span key={`actions-${student._id}`} className="flex gap-3"><Link to={`/admin/students/${student._id}/edit`} className="text-indigo-600 font-medium hover:underline">Edit</Link><button onClick={() => deleteStudent(student._id)} className="text-red-600 font-medium hover:underline">Delete</button></span>])} />{(data?.students || []).length === 0 ? <Empty>No student records found.</Empty> : null}</div>;
+  const renderStudents = () => <div className="space-y-5"><form className="flex flex-wrap gap-3" onSubmit={(event) => { event.preventDefault(); navigate(`/admin/students?q=${encodeURIComponent(search)}`); }}><div className="relative min-w-56 flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" /><input className="glass-input pl-10" placeholder="Search name, roll no or department" value={search} onChange={(event) => setSearch(event.target.value)} /></div><button className="glass-button px-4">Search</button><Link to="/admin/students/add" className="glass-button inline-flex items-center gap-2 bg-white px-4 py-3 text-black"><Plus className="h-4 w-4" />Add student</Link><a href={`${api.defaults.baseURL}/admin/export/csv`} className="glass-button inline-flex items-center px-4 py-3">Export CSV</a></form><Table headers={['Student', 'Roll No', 'Department', 'Class', 'Course', 'Attendance', 'Risk', 'Actions']} rows={(data?.students || []).map((student) => [<Link key={`name-${student._id}`} className="font-medium text-indigo-600 hover:text-indigo-800" to={`/admin/students/${student._id}`}>{student.name || 'Student'}</Link>, student.roll_no, student.department, student.class_name || <span className="text-gray-400 text-xs">—</span>, student.course_subject || <span className="text-gray-400 text-xs">—</span>, `${Number(student.attendance_pct || 0).toFixed(1)}%`, student.risk_level, <span key={`actions-${student._id}`} className="flex gap-3"><Link to={`/admin/students/${student._id}/edit`} className="text-indigo-600 font-medium hover:underline">Edit</Link><button onClick={() => deleteStudent(student._id)} className="text-red-600 font-medium hover:underline">Delete</button></span>])} />{(data?.students || []).length === 0 ? <Empty>No student records found.</Empty> : null}</div>;
 
   const renderPredictions = () => <><Select label="Filter by risk" value={new URLSearchParams(window.location.search).get('risk_level') || ''} onChange={(event) => navigate(`/admin/predictions${event.target.value ? `?risk_level=${event.target.value}` : ''}`)}><option value="">All risk levels</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option></Select><Table headers={['Student', 'Risk level', 'Score', 'Confidence', 'Forecast', 'Date', 'Actions']} rows={(data?.predictions || []).map((item) => [item.student_name || item.student?.name || 'Student', item.risk_level, Number(item.risk_score || 0).toFixed(1), `${Number(item.confidence || 0).toFixed(1)}%`, item.performance_forecast?.grade_tier || '—', item.predicted_at || item.created_at || '—', <button key={`delete-${item._id}`} onClick={() => submit(`/admin/predictions/${item._id}/delete`, {}, 'Prediction deleted.')} className="text-red-600 font-medium hover:underline">Delete</button>])} />{!data?.predictions?.length ? <Empty>No prediction records found.</Empty> : null}</>;
 
@@ -617,6 +617,7 @@ function StudentForm({ data, isEdit, pathname, submit }) {
   const [selDept, setSelDept] = useState(data?.student?.department || '');
   const [courses, setCourses] = useState([]);
   const [selCourse, setSelCourse] = useState(data?.student?.course_id || '');
+  const [showPwd, setShowPwd] = useState(false);
 
   useEffect(() => {
     if (!selDept) { setCourses([]); setSelCourse(''); return; }
@@ -632,7 +633,6 @@ function StudentForm({ data, isEdit, pathname, submit }) {
     submit(isEdit ? pathname : '/admin/students/add', payload, isEdit ? 'Student updated.' : 'Student created.');
   };
 
-  // Group courses by class_name for display
   const coursesByClass = courses.reduce((acc, c) => {
     if (!acc[c.class_name]) acc[c.class_name] = [];
     acc[c.class_name].push(c);
@@ -655,12 +655,11 @@ function StudentForm({ data, isEdit, pathname, submit }) {
         </select>
       </label>
 
-      {/* Course — class wise grouped */}
+      {/* Class — grouped by class_name */}
       <label className="block space-y-2 text-sm font-medium text-gray-700">
-        Class / Course
-        <select className="glass-input" value={selCourse} onChange={e => setSelCourse(e.target.value)}
-          disabled={!selDept}>
-          <option value="">{selDept ? (courses.length ? 'Select class & course' : 'No courses in this dept') : 'Select department first'}</option>
+        Class &amp; Course
+        <select className="glass-input" value={selCourse} onChange={e => setSelCourse(e.target.value)} disabled={!selDept}>
+          <option value="">{!selDept ? 'Select department first' : courses.length ? 'Select class & course' : 'No courses in this dept'}</option>
           {Object.entries(coursesByClass).map(([cls, cls_courses]) => (
             <optgroup key={cls} label={cls}>
               {cls_courses.map(c => <option key={c._id} value={c._id}>{c.subject}{c.teacher_name ? ` — ${c.teacher_name}` : ''}</option>)}
@@ -669,12 +668,23 @@ function StudentForm({ data, isEdit, pathname, submit }) {
         </select>
       </label>
 
-      <Select label="Semester" name="semester" defaultValue={String(data?.student?.semester || 1)}>
-        {[1,2,3,4,5,6,7,8].map(s => <option key={s}>{s}</option>)}
-      </Select>
-      <Input label="GPA" name="gpa" type="number" min="0" max="4" step="0.01" defaultValue={data?.student?.gpa ?? 3} />
+      {/* Attendance */}
       <Input label="Attendance (%)" name="attendance_pct" type="number" min="0" max="100" step="0.1" defaultValue={data?.student?.attendance_pct ?? 80} />
-      {!isEdit && <Input label="Initial password" name="password" type="password" defaultValue="Student123!" />}
+
+      {/* Password with show/hide — only on add */}
+      {!isEdit && (
+        <label className="block space-y-2 text-sm font-medium text-gray-700">
+          Password
+          <div className="relative">
+            <input className="glass-input pr-10" name="password" type={showPwd ? 'text' : 'password'} defaultValue="Student123!" minLength={6} required />
+            <button type="button" onClick={() => setShowPwd(v => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+              {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </label>
+      )}
+
       <div className="flex items-end gap-3 md:col-span-2">
         <button className="glass-button bg-white px-5 py-3 text-black">{isEdit ? 'Save changes' : 'Create student'}</button>
         <Link to="/admin/students" className="px-3 py-3 text-sm text-gray-500 hover:text-gray-800">Cancel</Link>
