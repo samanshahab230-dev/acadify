@@ -1109,6 +1109,33 @@ def student_marks(student_id):
     })
 
 
+# ─── DEPARTMENTS API ─────────────────────────────────────────────────────────
+
+@admin_bp.route('/api/departments', methods=['GET'])
+@login_required
+@role_required('admin')
+def api_departments_list():
+    """Return distinct department names from courses collection + students collection."""
+    db = get_db()
+    from_courses = db.courses.distinct('department')
+    from_students = db.students.distinct('department')
+    all_depts = sorted(set(from_courses + from_students))
+    return jsonify({'departments': all_depts})
+
+
+@admin_bp.route('/api/departments/classes', methods=['GET'])
+@login_required
+@role_required('admin')
+def api_department_classes():
+    """Return distinct class names for a given department."""
+    db = get_db()
+    dept = request.args.get('department', '').strip()
+    if not dept:
+        return jsonify({'classes': []})
+    classes = sorted(db.courses.distinct('class_name', {'department': dept}))
+    return jsonify({'classes': classes})
+
+
 # ─── COURSES MANAGEMENT ──────────────────────────────────────────────────────
 
 @admin_bp.route('/api/courses', methods=['GET'])
