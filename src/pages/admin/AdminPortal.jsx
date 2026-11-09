@@ -616,39 +616,25 @@ function SettingsPanel() {
 function StudentForm({ data, isEdit, pathname, submit }) {
   const [selDept, setSelDept] = useState(data?.student?.department || '');
   const [selClass, setSelClass] = useState(data?.student?.class_name || '');
-  const [courses, setCourses] = useState([]);
-  const [selCourse, setSelCourse] = useState(data?.student?.course_id || '');
   const [showPwd, setShowPwd] = useState(false);
   const [allDepts, setAllDepts] = useState([]);
   const [classes, setClasses] = useState([]);
 
-  // load all departments on mount
   useEffect(() => {
     api.get('/admin/api/departments').then(r => setAllDepts(r.data.departments || [])).catch(() => {});
   }, []);
 
-  // when dept changes → load classes
   useEffect(() => {
-    if (!selDept) { setClasses([]); setSelClass(''); setCourses([]); setSelCourse(''); return; }
+    if (!selDept) { setClasses([]); setSelClass(''); return; }
     api.get(`/admin/api/departments/classes?department=${encodeURIComponent(selDept)}`)
       .then(r => setClasses(r.data.classes || []))
       .catch(() => setClasses([]));
   }, [selDept]);
 
-  // when class changes → load courses
-  useEffect(() => {
-    if (!selDept || !selClass) { setCourses([]); setSelCourse(''); return; }
-    api.get(`/admin/api/courses?department=${encodeURIComponent(selDept)}`)
-      .then(r => {
-        const filtered = (r.data.courses || []).filter(c => c.class_name === selClass);
-        setCourses(filtered);
-      }).catch(() => setCourses([]));
-  }, [selDept, selClass]);
-
   const handleSubmit = (e) => {
     e.preventDefault();
     const payload = Object.fromEntries(new FormData(e.currentTarget));
-    if (selCourse) payload.course_id = selCourse;
+    if (selClass) payload.class_name = selClass;
     submit(isEdit ? pathname : '/admin/students/add', payload, isEdit ? 'Student updated.' : 'Student created.');
   };
 
@@ -679,16 +665,7 @@ function StudentForm({ data, isEdit, pathname, submit }) {
         </select>
       </label>
 
-      {/* Course — dropdown from courses in this class */}
-      <label className="block space-y-2 text-sm font-medium text-gray-700">
-        Course / Subject
-        <select className="glass-input" value={selCourse}
-          onChange={e => setSelCourse(e.target.value)}
-          disabled={!selClass}>
-          <option value="">{!selClass ? 'Select class first' : courses.length ? 'Select course' : 'No courses in this class'}</option>
-          {courses.map(c => <option key={c._id} value={c._id}>{c.subject}{c.teacher_name ? ` — ${c.teacher_name}` : ''}</option>)}
-        </select>
-      </label>
+      {/* Course / Subject — removed, auto-enroll in all class courses */}
 
       {/* Attendance */}
       <Input label="Attendance (%)" name="attendance_pct" type="number" min="0" max="100" step="0.1" defaultValue={data?.student?.attendance_pct ?? 80} />

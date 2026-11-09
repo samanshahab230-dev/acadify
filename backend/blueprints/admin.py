@@ -174,16 +174,26 @@ def student_add():
             last_prediction=pred
         )
 
-        # Enroll in course if selected
-        course_id = request.form.get('course_id', '').strip()
-        if course_id:
+        # Enroll in ALL courses of selected class
+        course_id_param = request.form.get('course_id', '').strip()
+        class_name_param = request.form.get('class_name', '').strip()
+        db_conn = get_db()
+        if class_name_param and department:
+            class_courses = list(db_conn.courses.find({'department': department, 'class_name': class_name_param}))
+            for course in class_courses:
+                CourseModel.enroll_student(str(course['_id']), student['_id'])
+            db_conn.students.update_one(
+                {'_id': student['_id']},
+                {'$set': {'class_name': class_name_param, 'course_id': class_courses[0]['_id'] if class_courses else None}}
+            )
+        elif course_id_param:
             try:
-                course = get_db().courses.find_one({'_id': ObjectId(course_id)})
+                course = db_conn.courses.find_one({'_id': ObjectId(course_id_param)})
                 if course:
-                    CourseModel.enroll_student(course_id, student['_id'])
-                    get_db().students.update_one(
+                    CourseModel.enroll_student(course_id_param, student['_id'])
+                    db_conn.students.update_one(
                         {'_id': student['_id']},
-                        {'$set': {'course_id': ObjectId(course_id), 'class_name': course.get('class_name', '')}}
+                        {'$set': {'course_id': ObjectId(course_id_param), 'class_name': course.get('class_name', '')}}
                     )
             except Exception:
                 pass
@@ -272,21 +282,23 @@ def student_edit(id):
                 notif_type="warning"
             )
 
-        # Update course enrollment if course_id changed
+        # Update course enrollment — enroll in ALL courses of selected class
+        new_class_name = request.form.get('class_name', '').strip()
         new_course_id = request.form.get('course_id', '').strip()
-        if new_course_id:
-            try:
-                db_conn = get_db()
-                course = db_conn.courses.find_one({'_id': ObjectId(new_course_id)})
-                if course:
-                    # unenroll from old course
-                    old_cid = student.get('course_id')
-                    if old_cid:
-                        CourseModel.unenroll_student(str(old_cid), student['_id'])
-                    CourseModel.enroll_student(new_course_id, student['_id'])
-                    StudentModel.update(id, {'course_id': ObjectId(new_course_id), 'class_name': course.get('class_name', '')})
-            except Exception:
-                pass
+        db_conn = get_db()
+        if new_class_name and department:
+            # unenroll from all old courses
+            old_enrollments = list(db_conn.course_enrollments.find({'student_id': student['_id']}))
+            for e in old_enrollments:
+                CourseModel.unenroll_student(str(e['course_id']), student['_id'])
+            # enroll in all courses of new class
+            class_courses = list(db_conn.courses.find({'department': department, 'class_name': new_class_name}))
+            for course in class_courses:
+                CourseModel.enroll_student(str(course['_id']), student['_id'])
+            StudentModel.update(id, {
+                'class_name': new_class_name,
+                'course_id': class_courses[0]['_id'] if class_courses else None
+            })
 
         DepartmentModel.recalculate_stats()
 
