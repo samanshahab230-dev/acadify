@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, BookOpen, Clock, Calendar, CheckSquare, Bell, User, LogOut, FileText, Menu, ShieldAlert, Camera, ScanFace, History, Medal, Calculator, Library, Settings, Award, Activity, Users, BarChart3, ClipboardList, Building2, MessageSquare, Database, ScrollText, UserCog, HandHeart } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Clock, Calendar, CheckSquare, Bell, User, LogOut, FileText, Menu, ShieldAlert, Camera, ScanFace, Settings, Activity, Users, BarChart3, Building2, MessageSquare, UserCog, HandHeart, Library } from 'lucide-react';
 import api from '../services/api';
 
 const Logo = () => (
@@ -58,14 +58,10 @@ export default function AppLayout() {
     { name: 'Profile', icon: User, path: '/student/profile' },
     { name: 'AI Predictions', icon: Activity, path: '/student/predictions' },
     { name: 'Notifications', icon: Bell, path: '/student/notifications' },
-    { name: 'Leaderboard', icon: Medal, path: '/student/leaderboard' },
-    { name: 'GPA Simulator', icon: Calculator, path: '/student/gpa-simulator' },
     { name: 'Study Resources', icon: Library, path: '/student/resources' },
     { name: 'Quick Notes', icon: FileText, path: '/student/notes' },
-    { name: 'Campus Pass', icon: Award, path: '/student/pass' },
     { name: 'Settings', icon: Settings, path: '/student/settings' },
     { name: 'Register Face', icon: ScanFace, path: '/face/register' },
-    { name: 'Face History', icon: History, path: '/face/history' },
   ];
 
   const adminMenuItems = [
