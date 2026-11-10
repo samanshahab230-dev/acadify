@@ -43,40 +43,57 @@ def dashboard():
         return jsonify({'error': 'Student profile not found.'}), 404
 
     from models.db import get_db
+    from models.course import CourseModel
     db = get_db()
     user = db.users.find_one({'_id': student.get('user_id')})
 
     latest_pred = PredictionModel.get_latest_by_student(student['_id'])
     today_classes = TimetableModel.get_today_classes(student['_id'])
     upcoming_assignments = AssignmentModel.get_upcoming(student['_id'], days=7)
-    current_gpa = float(student.get('gpa', 0.0))
+
+    # Course-wise attendance
+    enrollments = list(db.course_enrollments.find({'student_id': student['_id']}))
+    courses_att = []
+    for enr in enrollments:
+        course = db.courses.find_one({'_id': enr['course_id']})
+        if not course:
+            continue
+        att_records = list(db.course_attendance.find({'course_id': enr['course_id'], 'student_id': student['_id']}))
+        total = len(att_records)
+        present = sum(1 for r in att_records if r.get('status') == 'present')
+        pct = round(present / total * 100, 1) if total else 0
+        courses_att.append({'subject': course.get('subject', ''), 'class_name': course.get('class_name', ''), 'present': present, 'total': total, 'percentage': pct})
+
+    # Course-wise marks summary
+    courses_marks = []
+    for enr in enrollments:
+        course = db.courses.find_one({'_id': enr['course_id']})
+        if not course:
+            continue
+        mark = db.course_marks.find_one({'course_id': enr['course_id'], 'student_id': student['_id']})
+        if mark:
+            courses_marks.append({'subject': course.get('subject', ''), 'mid': mark.get('mid_marks', 0), 'final': mark.get('final_marks', 0), 'obtained': mark.get('obtained_marks', 0), 'total': mark.get('total_marks', 100), 'percentage': mark.get('percentage', 0), 'grade': mark.get('grade', '')})
 
     return jsonify({
         'student': {
             '_id': str(student['_id']),
             'roll_no': student.get('roll_no', ''),
             'department': student.get('department', ''),
-            'semester': student.get('semester', 1),
-            'gpa': current_gpa,
+            'class_name': student.get('class_name', ''),
             'attendance_pct': round(float(student.get('attendance_pct', 0)), 2),
             'risk_level': student.get('risk_level', 'LOW'),
-            'assignments_submitted_pct': student.get('assignments_submitted_pct', 0),
             'user': {'name': user.get('name', 'Student') if user else 'Student'},
         },
         'prediction': {
             'risk_score': latest_pred.get('risk_score'),
             'confidence': latest_pred.get('confidence'),
-            'performance_forecast': latest_pred.get('performance_forecast'),
+            'risk_level': latest_pred.get('risk_level'),
             'recommendations': latest_pred.get('recommendations', []),
         } if latest_pred else None,
-        'today_classes': [{
-            'subject': c.get('subject', ''), 'time': c.get('time', ''), 'type': c.get('type', '')
-        } for c in (today_classes or [])],
-        'upcoming_assignments': [{
-            '_id': str(a['_id']), 'title': a.get('title', ''),
-            'subject': a.get('subject', ''), 'due_date': str(a.get('due_date', ''))
-        } for a in (upcoming_assignments or [])],
-        'current_gpa': current_gpa,
+        'today_classes': [{'subject': c.get('subject', ''), 'time': c.get('time', ''), 'type': c.get('type', '')} for c in (today_classes or [])],
+        'upcoming_assignments': [{'_id': str(a['_id']), 'title': a.get('title', ''), 'subject': a.get('subject', ''), 'due_date': str(a.get('due_date', ''))} for a in (upcoming_assignments or [])],
+        'courses_attendance': courses_att,
+        'courses_marks': courses_marks,
     })
 
 
@@ -89,33 +106,30 @@ def profile():
         return jsonify({'error': 'Student not found'}), 404
     if request.method == 'POST':
         data = request.get_json(silent=True) or {}
-        department = (data.get('department') or request.form.get('department', '')).strip()
-        semester = data.get('semester') or request.form.get('semester')
         phone = (data.get('phone') or request.form.get('phone', '')).strip()
         bio = (data.get('bio') or request.form.get('bio', '')).strip()
-        if department and semester:
-            StudentModel.update(student['_id'], {
-                'department': department,
-                'semester': int(semester),
-                'phone': phone,
-                'bio': bio
-            })
-            return jsonify({'success': True, 'message': 'Profile updated successfully.'})
-        return jsonify({'success': False, 'message': 'Department and semester are required.'}), 400
+        StudentModel.update(student['_id'], {'phone': phone, 'bio': bio})
+        return jsonify({'success': True, 'message': 'Profile updated successfully.'})
     from models.db import get_db
     db = get_db()
     user = db.users.find_one({'_id': student.get('user_id')})
+    enrollments = list(db.course_enrollments.find({'student_id': student['_id']}))
+    enrolled_courses = []
+    for enr in enrollments:
+        course = db.courses.find_one({'_id': enr['course_id']})
+        if course:
+            enrolled_courses.append({'subject': course.get('subject', ''), 'class_name': course.get('class_name', ''), 'teacher_name': course.get('teacher_name', '')})
     return jsonify({
         'student': {
             '_id': str(student['_id']),
             'roll_no': student.get('roll_no', ''),
             'department': student.get('department', ''),
-            'semester': student.get('semester', 1),
-            'gpa': float(student.get('gpa', 0.0)),
+            'class_name': student.get('class_name', ''),
             'attendance_pct': float(student.get('attendance_pct', 0.0)),
             'risk_level': student.get('risk_level', 'LOW'),
             'phone': student.get('phone', ''),
             'bio': student.get('bio', ''),
+            'enrolled_courses': enrolled_courses,
             'user': {'name': user.get('name', '') if user else '', 'email': user.get('email', '') if user else ''},
         }
     })
@@ -128,24 +142,42 @@ def academics():
     student = _get_student_or_abort()
     if not student:
         return jsonify({'error': 'Student not found'}), 404
-    latest_pred = PredictionModel.get_latest_by_student(student['_id'])
-    subjects = AttendanceModel.get_subjects(student['_id'])
+    from models.db import get_db
+    db = get_db()
+    # Course-wise marks from course_marks collection
+    enrollments = list(db.course_enrollments.find({'student_id': student['_id']}))
+    courses = []
+    for enr in enrollments:
+        course = db.courses.find_one({'_id': enr['course_id']})
+        if not course:
+            continue
+        mark = db.course_marks.find_one({'course_id': enr['course_id'], 'student_id': student['_id']})
+        att_records = list(db.course_attendance.find({'course_id': enr['course_id'], 'student_id': student['_id']}))
+        total_att = len(att_records)
+        present = sum(1 for r in att_records if r.get('status') == 'present')
+        att_pct = round(present / total_att * 100, 1) if total_att else 0
+        courses.append({
+            'subject': course.get('subject', ''),
+            'class_name': course.get('class_name', ''),
+            'teacher_name': course.get('teacher_name', ''),
+            'mid_marks': mark.get('mid_marks', 0) if mark else None,
+            'final_marks': mark.get('final_marks', 0) if mark else None,
+            'obtained_marks': mark.get('obtained_marks', 0) if mark else None,
+            'total_marks': mark.get('total_marks', 100) if mark else None,
+            'percentage': mark.get('percentage', 0) if mark else None,
+            'grade': mark.get('grade', '') if mark else None,
+            'attendance_pct': att_pct,
+            'present': present,
+            'total_classes': total_att,
+        })
     return jsonify({
         'student': {
             '_id': str(student['_id']),
-            'gpa': float(student.get('gpa', 0.0)),
-            'attendance_pct': float(student.get('attendance_pct', 0.0)),
-            'risk_level': student.get('risk_level', 'LOW'),
-            'semester': student.get('semester', 1),
             'department': student.get('department', ''),
+            'class_name': student.get('class_name', ''),
+            'risk_level': student.get('risk_level', 'LOW'),
         },
-        'prediction': {
-            'risk_score': latest_pred.get('risk_score'),
-            'confidence': latest_pred.get('confidence'),
-            'risk_level': latest_pred.get('risk_level'),
-            'recommendations': latest_pred.get('recommendations', []),
-        } if latest_pred else None,
-        'subjects': [{'subject': s['subject'], 'attended': s.get('attended', 0), 'total_classes': s.get('total_classes', 0)} for s in subjects],
+        'courses': courses,
     })
 
 
@@ -538,18 +570,37 @@ def marks():
     student = _get_student_or_abort()
     if not student:
         return jsonify({'error': 'Student not found'}), 404
-    all_marks = MarksModel.get_by_student(student['_id'])
-    analytics = MarksModel.get_analytics(student['_id'])
+    from models.db import get_db
+    db = get_db()
+    enrollments = list(db.course_enrollments.find({'student_id': student['_id']}))
+    courses_marks = []
+    total_pct_sum = 0
+    marked_count = 0
+    for enr in enrollments:
+        course = db.courses.find_one({'_id': enr['course_id']})
+        if not course:
+            continue
+        mark = db.course_marks.find_one({'course_id': enr['course_id'], 'student_id': student['_id']})
+        courses_marks.append({
+            'subject': course.get('subject', ''),
+            'class_name': course.get('class_name', ''),
+            'teacher_name': course.get('teacher_name', ''),
+            'mid_marks': mark.get('mid_marks', 0) if mark else None,
+            'final_marks': mark.get('final_marks', 0) if mark else None,
+            'obtained_marks': mark.get('obtained_marks', 0) if mark else None,
+            'total_marks': mark.get('total_marks', 100) if mark else None,
+            'percentage': mark.get('percentage', 0) if mark else None,
+            'grade': mark.get('grade', '') if mark else None,
+        })
+        if mark:
+            total_pct_sum += mark.get('percentage', 0)
+            marked_count += 1
+    avg_percentage = round(total_pct_sum / marked_count, 1) if marked_count else None
     return jsonify({
-        'marks': [{
-            '_id': str(m['_id']),
-            'subject': m.get('subject', ''),
-            'marks_obtained': m.get('marks_obtained', 0),
-            'total_marks': m.get('total_marks', 100),
-            'exam_type': m.get('exam_type', ''),
-            'created_at': m['created_at'].strftime('%Y-%m-%d') if m.get('created_at') else '',
-        } for m in all_marks],
-        'analytics': analytics
+        'courses_marks': courses_marks,
+        'avg_percentage': avg_percentage,
+        'total_courses': len(courses_marks),
+        'marked_courses': marked_count,
     })
 
 
