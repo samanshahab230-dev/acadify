@@ -50,18 +50,18 @@ export default function AppLayout() {
     { name: 'Dashboard', icon: LayoutDashboard, path: '/student/dashboard' },
     { name: 'Academics', icon: BookOpen, path: '/student/academics' },
     { name: 'Attendance', icon: CheckSquare, path: '/student/attendance' },
+    { name: 'Register Face', icon: ScanFace, path: '/face/register' },
     { name: 'Marks & Performance', icon: BarChart3, path: '/student/marks' },
     { name: 'Timetable', icon: Clock, path: '/student/timetable' },
     { name: 'Assignments', icon: FileText, path: '/student/assignments' },
     { name: 'Exams', icon: Calendar, path: '/student/exams' },
-    { name: 'Counseling', icon: ShieldAlert, path: '/student/counseling' },
-    { name: 'Profile', icon: User, path: '/student/profile' },
     { name: 'AI Predictions', icon: Activity, path: '/student/predictions' },
-    { name: 'Notifications', icon: Bell, path: '/student/notifications' },
     { name: 'Study Resources', icon: Library, path: '/student/resources' },
     { name: 'Quick Notes', icon: FileText, path: '/student/notes' },
+    { name: 'Counseling', icon: ShieldAlert, path: '/student/counseling' },
+    { name: 'Notifications', icon: Bell, path: '/student/notifications' },
+    { name: 'Profile', icon: User, path: '/student/profile' },
     { name: 'Settings', icon: Settings, path: '/student/settings' },
-    { name: 'Register Face', icon: ScanFace, path: '/face/register' },
   ];
 
   const adminMenuItems = [
