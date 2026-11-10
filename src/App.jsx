@@ -43,12 +43,9 @@ const lazyNamed = (importFn, name) =>
 
 const Predictions     = lazyNamed(() => import('./pages/student/PortalFeatures'), 'Predictions');
 const Notifications   = lazyNamed(() => import('./pages/student/PortalFeatures'), 'Notifications');
-const Leaderboard     = lazyNamed(() => import('./pages/student/PortalFeatures'), 'Leaderboard');
-const GpaSimulator    = lazyNamed(() => import('./pages/student/PortalFeatures'), 'GpaSimulator');
 const Resources       = lazyNamed(() => import('./pages/student/PortalFeatures'), 'Resources');
 const StudentSettings = lazyNamed(() => import('./pages/student/PortalFeatures'), 'StudentSettings');
 const StudentNotes    = lazyNamed(() => import('./pages/student/PortalFeatures'), 'StudentNotes');
-const CampusPass      = lazyNamed(() => import('./pages/student/PortalFeatures'), 'CampusPass');
 
 const TeacherAttendancePage  = lazyNamed(() => import('./pages/teacher/TeacherPages'), 'TeacherAttendancePage');
 const TeacherMarksPage       = lazyNamed(() => import('./pages/teacher/TeacherPages'), 'TeacherMarksPage');
@@ -79,11 +76,8 @@ function App() {
             <Route path="/student/marks"        element={<StudentMarks />} />
             <Route path="/student/predictions"  element={<Predictions />} />
             <Route path="/student/notifications" element={<Notifications />} />
-            <Route path="/student/leaderboard"  element={<Leaderboard />} />
-            <Route path="/student/gpa-simulator" element={<GpaSimulator />} />
             <Route path="/student/resources"    element={<Resources />} />
             <Route path="/student/notes"        element={<StudentNotes />} />
-            <Route path="/student/pass"         element={<CampusPass />} />
             <Route path="/student/settings"     element={<StudentSettings />} />
 
             {/* Teacher */}

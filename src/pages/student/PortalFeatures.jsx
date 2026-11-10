@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, Award, Bell, BookOpen, Calculator, Check, Download, FileText, LockKeyhole, Medal, RefreshCw, Trash2 } from 'lucide-react';
+import { Activity, Bell, BookOpen, Check, Download, FileText, LockKeyhole, RefreshCw, Trash2 } from 'lucide-react';
 import api from '../../services/api';
 
 function usePageData(path) {
