@@ -6,8 +6,7 @@ import { Skeleton, SkeletonCard } from '../../components/Skeleton';
 
 const headings = {
   '/admin/students': ['Student Directory', 'Search, review, and manage student records.'],
-  '/admin/predictions': ['Risk Predictions', 'Review recent student risk forecasts.'],
-  '/admin/predict': ['Run AI Prediction', 'Recalculate a forecast for a student.'],
+  '/admin/predictions': ['Risk Predictions', 'Review and run AI risk forecasts for students.'],
   '/admin/attendance': ['Attendance Control', 'Review and manage student attendance.'],
   '/admin/counseling': ['Counseling Requests', 'Review requests and send replies to students.'],
   '/admin/interventions': ['Interventions', 'Track support actions for students.'],
@@ -168,9 +167,9 @@ export default function AdminPortal() {
 
   const renderStudents = () => <div className="space-y-5"><form className="flex flex-wrap gap-3" onSubmit={(event) => { event.preventDefault(); navigate(`/admin/students?q=${encodeURIComponent(search)}`); }}><div className="relative min-w-56 flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" /><input className="glass-input pl-10" placeholder="Search name, roll no or department" value={search} onChange={(event) => setSearch(event.target.value)} /></div><button className="glass-button px-4">Search</button><Link to="/admin/students/add" className="glass-button inline-flex items-center gap-2 bg-white px-4 py-3 text-black"><Plus className="h-4 w-4" />Add student</Link><a href={`${api.defaults.baseURL}/admin/export/csv`} className="glass-button inline-flex items-center px-4 py-3">Export CSV</a></form><Table headers={['Student', 'Roll No', 'Department', 'Class', 'Course', 'Attendance', 'Risk', 'Actions']} rows={(data?.students || []).map((student) => [<Link key={`name-${student._id}`} className="font-medium text-indigo-600 hover:text-indigo-800" to={`/admin/students/${student._id}`}>{student.name || 'Student'}</Link>, student.roll_no, student.department, student.class_name || <span className="text-gray-400 text-xs">—</span>, student.course_subject || <span className="text-gray-400 text-xs">—</span>, `${Number(student.attendance_pct || 0).toFixed(1)}%`, student.risk_level, <span key={`actions-${student._id}`} className="flex gap-3"><Link to={`/admin/students/${student._id}/edit`} className="text-indigo-600 font-medium hover:underline">Edit</Link><button onClick={() => deleteStudent(student._id)} className="text-red-600 font-medium hover:underline">Delete</button></span>])} />{(data?.students || []).length === 0 ? <Empty>No student records found.</Empty> : null}</div>;
 
-  const renderPredictions = () => <><Select label="Filter by risk" value={new URLSearchParams(window.location.search).get('risk_level') || ''} onChange={(event) => navigate(`/admin/predictions${event.target.value ? `?risk_level=${event.target.value}` : ''}`)}><option value="">All risk levels</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option></Select><Table headers={['Student', 'Risk level', 'Score', 'Confidence', 'Forecast', 'Date', 'Actions']} rows={(data?.predictions || []).map((item) => [item.student_name || item.student?.name || 'Student', item.risk_level, Number(item.risk_score || 0).toFixed(1), `${Number(item.confidence || 0).toFixed(1)}%`, item.performance_forecast?.grade_tier || '—', item.predicted_at || item.created_at || '—', <button key={`delete-${item._id}`} onClick={() => submit(`/admin/predictions/${item._id}/delete`, {}, 'Prediction deleted.')} className="text-red-600 font-medium hover:underline">Delete</button>])} />{!data?.predictions?.length ? <Empty>No prediction records found.</Empty> : null}</>;
+  const renderPredictions = () => <PredictionsPanel data={data} submit={submit} navigate={navigate} />;
 
-  const renderPredict = () => <div className="max-w-xl space-y-4"><Select label="Student" required value={selectedStudent} onChange={(event) => setSelectedStudent(event.target.value)}><option value="">Choose a student</option>{(data?.students || []).map((student) => <option key={student._id} value={student._id}>{student.name} · {student.roll_no}</option>)}</Select><button disabled={!selectedStudent} onClick={() => submit(`/api/predict/${selectedStudent}`, {}, 'Prediction saved.')} className="glass-button inline-flex items-center gap-2 bg-white px-5 py-3 text-black disabled:opacity-40"><RefreshCw className="h-4 w-4" />Run prediction</button>{notice ? <p role="status" className="text-sm text-emerald-600 font-medium">{notice}</p> : null}</div>;
+  const renderPredict = () => null; // merged into predictions page
 
   const renderAttendance = () => isAttendanceDetail ? <div className="space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold text-gray-900">{data?.student?.name} · {data?.student?.roll_no}</h2><p className="text-sm text-gray-500">Current streak: {data?.streak || 0} days</p></div><button onClick={() => submit(`${pathname}/seed`, {}, 'Default subjects added.')} className="glass-button px-4 py-2">Seed subjects</button></div><Table headers={['Subject', 'Attended', 'Classes', 'Attendance']} rows={(data?.subjects || []).map((subject) => [subject.subject, subject.attended, subject.total_classes, `${Number(subject.attendance_pct || 0).toFixed(1)}%`])} /><form className="grid gap-3 border-t border-gray-200 pt-5 sm:grid-cols-4" onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); submit(`${pathname}/mark`, Object.fromEntries(form)); }}><Input label="Subject" name="subject" required /><Select label="Status" name="status"><option value="present">Present</option><option value="absent">Absent</option></Select><Input label="Date" name="date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required /><button className="glass-button self-end bg-white px-4 py-3 text-black">Mark attendance</button></form></div> : <><Table headers={['Student', 'Roll number', 'Department', 'Attendance', 'Subjects']} rows={(data?.students || []).map((student) => [<Link key={`attendance-${student._id}`} className="text-indigo-600 font-medium hover:underline" to={`/admin/attendance/${student._id}`}>{student.name}</Link>, student.roll_no, student.department, `${Number(student.attendance_pct || 0).toFixed(1)}%`, student.subject_count])} />{!data?.students?.length ? <Empty>No students found.</Empty> : null}</>;
 
@@ -190,7 +189,7 @@ export default function AdminPortal() {
     if (pathname.startsWith('/admin/students')) return isStudentDetail ? <><h2 className="text-xl font-semibold text-gray-900">{data?.student?.name}</h2><p className="text-gray-500">{data?.student?.roll_no} · {data?.student?.department}</p><div className="flex gap-3"><Link className="text-indigo-600 font-medium hover:underline" to={`/admin/students/${data?.student?._id}/edit`}>Edit record</Link><Link className="text-indigo-600 font-medium hover:underline" to={`/admin/report-card/${data?.student?._id}`}>Report card</Link></div><StudentConnections key={data?.student?._id} student={data?.student || {}} teachers={data?.teacher_options || []} parents={data?.parent_options || []} onSave={(payload) => api.post(`${pathname}/connections`, payload).then(({ data: response }) => { setNotice(response.message); reload(); })} /><Table headers={['Prediction', 'Score', 'Risk']} rows={(data?.predictions || []).map((item) => [item.predicted_at || item.created_at || 'Forecast', item.risk_score, item.risk_level])} /></> : renderStudents();
     if (pathname.startsWith('/admin/attendance')) return renderAttendance();
     if (pathname === '/admin/predictions') return renderPredictions();
-    if (pathname === '/admin/predict') return renderPredict();
+    if (pathname === '/admin/predict') return renderPredictions();
     if (pathname === '/admin/counseling') return renderCounseling();
     if (pathname === '/admin/interventions') return renderInterventions();
     if (pathname === '/admin/departments') return renderDepartments();
@@ -1003,6 +1002,46 @@ function DepartmentsPanel({ data, submit }) {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+function PredictionsPanel({ data, submit, navigate }) {
+  const [selStudent, setSelStudent] = useState('');
+  const [running, setRunning] = useState(false);
+  const riskFilter = new URLSearchParams(window.location.search).get('risk_level') || '';
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end gap-3 border-b border-gray-200 pb-5">
+        <div className="flex-1 min-w-48">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Run AI Prediction for student</label>
+          <select className="glass-input" value={selStudent} onChange={e => setSelStudent(e.target.value)}>
+            <option value="">Choose a student</option>
+            {(data?.students || []).map(s => <option key={s._id} value={s._id}>{s.name} · {s.roll_no}</option>)}
+          </select>
+        </div>
+        <button disabled={!selStudent || running}
+          onClick={async () => { setRunning(true); await submit(`/api/predict/${selStudent}`, {}, 'Prediction saved.'); setRunning(false); }}
+          className="glass-button inline-flex items-center gap-2 bg-white px-5 py-3 text-black disabled:opacity-40">
+          <RefreshCw className={`h-4 w-4 ${running ? 'animate-spin' : ''}`} />Run prediction
+        </button>
+      </div>
+      <Select label="Filter by risk" value={riskFilter} onChange={e => navigate(`/admin/predictions${e.target.value ? `?risk_level=${e.target.value}` : ''}`)}>
+        <option value="">All risk levels</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+      </Select>
+      <Table
+        headers={['Student', 'Risk level', 'Score', 'Confidence', 'Forecast', 'Date', 'Actions']}
+        rows={(data?.predictions || []).map(item => [
+          item.student_name || item.student?.name || 'Student',
+          item.risk_level,
+          Number(item.risk_score || 0).toFixed(1),
+          `${Number(item.confidence || 0).toFixed(1)}%`,
+          item.performance_forecast?.grade_tier || '—',
+          item.predicted_at || item.created_at || '—',
+          <button key={`del-${item._id}`} onClick={() => submit(`/admin/predictions/${item._id}/delete`, {}, 'Prediction deleted.')} className="text-red-600 font-medium hover:underline">Delete</button>
+        ])}
+      />
+      {!data?.predictions?.length && <Empty>No prediction records found.</Empty>}
     </div>
   );
 }

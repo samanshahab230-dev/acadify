@@ -72,21 +72,15 @@ export default function AppLayout() {
     { name: 'Command Center', icon: LayoutDashboard, path: '/admin/dashboard' },
     { name: 'Student Directory', icon: Users, path: '/admin/students' },
     { name: 'Risk Predictions', icon: Activity, path: '/admin/predictions' },
-    { name: 'Run Prediction', icon: ShieldAlert, path: '/admin/predict' },
-    { name: 'Attendance Control', icon: ClipboardList, path: '/admin/attendance' },
     { name: 'Reports', icon: BarChart3, path: '/admin/reports' },
     { name: 'Counseling Requests', icon: MessageSquare, path: '/admin/counseling' },
     { name: 'Interventions', icon: HandHeart, path: '/admin/interventions' },
     { name: 'Departments', icon: Building2, path: '/admin/departments' },
-    { name: 'Analytics', icon: BarChart3, path: '/admin/analytics' },
-    { name: 'CSV Import', icon: Database, path: '/admin/data-upload' },
     { name: 'Bulk Notifications', icon: Bell, path: '/admin/notifications' },
     { name: 'User Accounts', icon: UserCog, path: '/admin/users' },
-    { name: 'Audit Stream', icon: ScrollText, path: '/admin/audit-logs' },
     { name: 'System Settings', icon: Settings, path: '/admin/settings' },
     { name: 'AI Face Attendance', icon: Camera, path: '/face/attendance' },
     { name: 'Register Student Face', icon: ScanFace, path: '/face/register' },
-    { name: 'Face History', icon: History, path: '/face/history' },
   ];
 
   const teacherMenuItems = [

@@ -103,16 +103,11 @@ function App() {
             <Route path="/admin/reports"          element={<AdminReports />} />
             <Route path="/admin/students/*"       element={<AdminPortal />} />
             <Route path="/admin/predictions"      element={<AdminPortal />} />
-            <Route path="/admin/predict"          element={<AdminPortal />} />
-            <Route path="/admin/attendance/*"     element={<AdminPortal />} />
             <Route path="/admin/counseling"       element={<AdminPortal />} />
             <Route path="/admin/interventions"    element={<AdminPortal />} />
             <Route path="/admin/departments"      element={<AdminPortal />} />
-            <Route path="/admin/analytics"        element={<AdminPortal />} />
-            <Route path="/admin/data-upload"      element={<AdminPortal />} />
             <Route path="/admin/notifications"    element={<AdminPortal />} />
             <Route path="/admin/users"            element={<AdminPortal />} />
-            <Route path="/admin/audit-logs"       element={<AdminPortal />} />
             <Route path="/admin/report-card/:id"  element={<AdminPortal />} />
             <Route path="/admin/settings"         element={<AdminPortal />} />
             <Route path="/admin/schedule"         element={<AdminPortal />} />
