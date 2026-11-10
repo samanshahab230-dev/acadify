@@ -114,18 +114,34 @@ def students():
         ]
 
     student_list = StudentModel.get_all(query=mongo_query, limit=100)
-    # attach class_name and course_subject from courses collection
     db = get_db()
     for s in student_list:
-        if s.get('course_id'):
+        sid = s.get('_id')
+        # attach class_name from student record or first enrolled course
+        if not s.get('class_name') and s.get('course_id'):
             course = db.courses.find_one({'_id': s['course_id']})
             if course:
                 s['class_name'] = course.get('class_name', '')
-                s['course_subject'] = course.get('subject', '')
+        # attach per-course attendance
+        try:
+            enrollments = list(db.course_enrollments.find({'student_id': sid}))
+            courses_att = []
+            for enr in enrollments:
+                course = db.courses.find_one({'_id': enr['course_id']})
+                if not course:
+                    continue
+                att_records = list(db.course_attendance.find({'course_id': enr['course_id'], 'student_id': sid}))
+                total = len(att_records)
+                present = sum(1 for r in att_records if r.get('status') == 'present')
+                pct = round(present / total * 100, 1) if total else 0
+                courses_att.append({'subject': course.get('subject', ''), 'percentage': pct, 'present': present, 'total': total})
+            s['courses_attendance'] = courses_att
+        except Exception:
+            s['courses_attendance'] = []
     departments = DepartmentModel.get_all()
-    
-    return render_template('admin/students.html', 
-                           students=student_list, 
+
+    return render_template('admin/students.html',
+                           students=student_list,
                            departments=departments,
                            query_str=query_str,
                            dept_filter=dept_filter,
@@ -947,13 +963,61 @@ def attendance_seed(student_id):
 @login_required
 @role_required('admin')
 def interventions():
+    db = get_db()
     all_interventions = InterventionModel.get_all(limit=100)
     active_count = InterventionModel.count_active()
-    students = StudentModel.get_all(query={'risk_level': 'HIGH'}, limit=200)
-    return render_template('admin/interventions.html',
-                           interventions=all_interventions,
-                           active_count=active_count,
-                           students=students)
+    # Attach course-wise attendance to each intervention
+    for iv in all_interventions:
+        try:
+            sid = ObjectId(iv.get('student_id'))
+            enrollments = list(db.course_enrollments.find({'student_id': sid}))
+            courses_att = []
+            for enr in enrollments:
+                course = db.courses.find_one({'_id': enr['course_id']})
+                if not course:
+                    continue
+                att_records = list(db.course_attendance.find({'course_id': enr['course_id'], 'student_id': sid}))
+                total = len(att_records)
+                present = sum(1 for r in att_records if r.get('status') == 'present')
+                pct = round(present / total * 100, 1) if total else 0
+                courses_att.append({'subject': course.get('subject', ''), 'class_name': course.get('class_name', ''), 'present': present, 'total': total, 'percentage': pct})
+            iv['courses_attendance'] = courses_att
+        except Exception:
+            iv['courses_attendance'] = []
+    return jsonify({
+        'interventions': all_interventions,
+        'active_count': active_count,
+        'students': []
+    })
+
+
+@admin_bp.route('/api/interventions/students')
+@login_required
+@role_required('admin')
+def api_intervention_students():
+    """Return high-risk students filtered by department and class."""
+    db = get_db()
+    dept = request.args.get('department', '').strip()
+    class_name = request.args.get('class_name', '').strip()
+    if not dept or not class_name:
+        return jsonify({'students': []})
+    # Get student IDs enrolled in any course of this dept+class
+    courses = list(db.courses.find({'department': dept, 'class_name': class_name}))
+    course_ids = [c['_id'] for c in courses]
+    enrolled_student_ids = db.course_enrollments.distinct('student_id', {'course_id': {'$in': course_ids}})
+    # Filter to high-risk only
+    students_raw = list(db.students.find({'_id': {'$in': enrolled_student_ids}, 'risk_level': 'HIGH'}))
+    result = []
+    for s in students_raw:
+        user = db.users.find_one({'_id': s.get('user_id')})
+        result.append({
+            '_id': str(s['_id']),
+            'name': user.get('name', '') if user else '',
+            'roll_no': s.get('roll_no', ''),
+            'risk_level': s.get('risk_level', ''),
+            'attendance_pct': s.get('attendance_pct', 0)
+        })
+    return jsonify({'students': result})
 
 
 # ─── REPORTS ────────────────────────────────────────────────────────────────────
@@ -1258,26 +1322,25 @@ def api_course_attendance_mark(course_id):
 @login_required
 @role_required('admin')
 def intervention_add():
-    student_id = request.form.get('student_id', '').strip()
-    intervention_type = request.form.get('intervention_type', 'counseling')
-    notes = request.form.get('notes', '').strip()
+    data = request.get_json(silent=True) or request.form
+    student_id = (data.get('student_id') or '').strip()
+    intervention_type = data.get('intervention_type', 'counseling')
+    notes = (data.get('notes') or '').strip()
     if student_id and notes:
         InterventionModel.create(student_id, current_user.name, intervention_type, notes)
         ActivityModel.log('intervention', 'Intervention Logged',
                           f'Admin {current_user.name} logged {intervention_type} intervention')
         AuditLogModel.log_action(current_user.name, 'INTERVENTION_ADDED',
                                  f'{intervention_type} for student {student_id}')
-        flash('Intervention logged successfully.', 'success')
-    else:
-        flash('Student and notes are required.', 'danger')
-    return redirect(url_for('admin.interventions'))
+        return jsonify({'success': True, 'message': 'Intervention logged.'})
+    return jsonify({'success': False, 'message': 'Student and notes are required.'}), 400
 
 
 @admin_bp.route('/interventions/<intervention_id>/status', methods=['POST'])
 @login_required
 @role_required('admin')
 def intervention_status(intervention_id):
-    status = request.form.get('status', 'active')
+    data = request.get_json(silent=True) or request.form
+    status = data.get('status', 'active')
     InterventionModel.update_status(intervention_id, status)
-    flash('Intervention status updated.', 'success')
-    return redirect(url_for('admin.interventions'))
+    return jsonify({'success': True, 'message': 'Intervention updated.'})

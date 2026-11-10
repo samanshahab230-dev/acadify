@@ -165,7 +165,7 @@ export default function AdminPortal() {
 
   const renderStudentForm = () => <StudentForm data={data} isEdit={isEdit} pathname={pathname} submit={submit} />;
 
-  const renderStudents = () => <div className="space-y-5"><form className="flex flex-wrap gap-3" onSubmit={(event) => { event.preventDefault(); navigate(`/admin/students?q=${encodeURIComponent(search)}`); }}><div className="relative min-w-56 flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" /><input className="glass-input pl-10" placeholder="Search name, roll no or department" value={search} onChange={(event) => setSearch(event.target.value)} /></div><button className="glass-button px-4">Search</button><Link to="/admin/students/add" className="glass-button inline-flex items-center gap-2 bg-white px-4 py-3 text-black"><Plus className="h-4 w-4" />Add student</Link><a href={`${api.defaults.baseURL}/admin/export/csv`} className="glass-button inline-flex items-center px-4 py-3">Export CSV</a></form><Table headers={['Student', 'Roll No', 'Department', 'Class', 'Course', 'Attendance', 'Risk', 'Actions']} rows={(data?.students || []).map((student) => [<Link key={`name-${student._id}`} className="font-medium text-indigo-600 hover:text-indigo-800" to={`/admin/students/${student._id}`}>{student.name || 'Student'}</Link>, student.roll_no, student.department, student.class_name || <span className="text-gray-400 text-xs">—</span>, student.course_subject || <span className="text-gray-400 text-xs">—</span>, `${Number(student.attendance_pct || 0).toFixed(1)}%`, student.risk_level, <span key={`actions-${student._id}`} className="flex gap-3"><Link to={`/admin/students/${student._id}/edit`} className="text-indigo-600 font-medium hover:underline">Edit</Link><button onClick={() => deleteStudent(student._id)} className="text-red-600 font-medium hover:underline">Delete</button></span>])} />{(data?.students || []).length === 0 ? <Empty>No student records found.</Empty> : null}</div>;
+  const renderStudents = () => <div className="space-y-5"><form className="flex flex-wrap gap-3" onSubmit={(event) => { event.preventDefault(); navigate(`/admin/students?q=${encodeURIComponent(search)}`); }}><div className="relative min-w-56 flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" /><input className="glass-input pl-10" placeholder="Search name, roll no or department" value={search} onChange={(event) => setSearch(event.target.value)} /></div><button className="glass-button px-4">Search</button><Link to="/admin/students/add" className="glass-button inline-flex items-center gap-2 bg-white px-4 py-3 text-black"><Plus className="h-4 w-4" />Add student</Link><a href={`${api.defaults.baseURL}/admin/export/csv`} className="glass-button inline-flex items-center px-4 py-3">Export CSV</a></form><Table headers={['Student', 'Roll No', 'Department', 'Class', 'Course-wise Attendance', 'Risk', 'Actions']} rows={(data?.students || []).map((student) => [<Link key={`name-${student._id}`} className="font-medium text-indigo-600 hover:text-indigo-800" to={`/admin/students/${student._id}`}>{student.name || 'Student'}</Link>, student.roll_no, student.department, student.class_name || <span className="text-gray-400 text-xs">—</span>, student.courses_attendance?.length ? <div key={`att-${student._id}`} className="space-y-0.5">{student.courses_attendance.map((c, i) => <div key={i} className="text-xs"><span className="text-gray-500">{c.subject}:</span> <span className={c.percentage < 75 ? 'text-red-500 font-semibold' : 'text-emerald-600'}>{c.percentage}%</span></div>)}</div> : <span className="text-gray-400 text-xs">{Number(student.attendance_pct || 0).toFixed(1)}%</span>, student.risk_level, <span key={`actions-${student._id}`} className="flex gap-3"><Link to={`/admin/students/${student._id}/edit`} className="text-indigo-600 font-medium hover:underline">Edit</Link><button onClick={() => deleteStudent(student._id)} className="text-red-600 font-medium hover:underline">Delete</button></span>])} />{(data?.students || []).length === 0 ? <Empty>No student records found.</Empty> : null}</div>;
 
   const renderPredictions = () => <PredictionsPanel data={data} submit={submit} navigate={navigate} />;
 
@@ -175,7 +175,7 @@ export default function AdminPortal() {
 
   const renderCounseling = () => <div className="space-y-4">{(data?.requests || []).map((item) => <article key={item._id} className="border-b border-gray-200 py-4"><div className="flex flex-wrap justify-between gap-3"><div><h2 className="font-semibold text-gray-900">{item.subject}</h2><p className="mt-1 text-sm text-gray-500">{item.student_name || item.student?.name || 'Student'} · {item.urgency} · {item.created_at}</p></div><Select label="Status" value={item.status} onChange={(event) => submit(`/admin/counseling/${item._id}/status`, { status: event.target.value }, 'Request status updated.')}><option value="open">Open</option><option value="in_review">In review</option><option value="resolved">Resolved</option><option value="closed">Closed</option></Select></div><p className="mt-3 whitespace-pre-wrap text-sm text-gray-600">{item.message}</p>{item.evidence_filename || item.self_check_report ? <div className="mt-3 flex flex-wrap gap-4 text-sm">{item.evidence_filename && <a className="text-indigo-600 font-medium hover:underline" href={`${api.defaults.baseURL}/face/support-evidence/${item._id}`}>Download evidence</a>}{item.self_check_report && <a className="text-indigo-600 font-medium hover:underline" href={`${api.defaults.baseURL}/face/self-check-report/${item._id}`}>Download self-check report</a>}</div> : null}{item.reply ? <p className="mt-3 border-l-2 border-indigo-400 pl-3 text-sm text-gray-700">Reply: {item.reply}</p> : null}<form className="mt-4 flex flex-wrap gap-2" onSubmit={(event) => { event.preventDefault(); const reply = new FormData(event.currentTarget).get('reply'); submit(`/admin/counseling/${item._id}/reply`, { reply }, 'Reply sent.'); }}><input name="reply" className="glass-input min-w-60 flex-1" placeholder="Write a reply" required /><button className="glass-button px-4">Send reply</button></form></article>)}{!data?.requests?.length ? <Empty>No counseling requests.</Empty> : null}</div>;
 
-  const renderInterventions = () => <div className="space-y-5"><form className="grid gap-3 sm:grid-cols-4" onSubmit={(event) => { event.preventDefault(); submit('/admin/interventions/add', Object.fromEntries(new FormData(event.currentTarget)), 'Intervention logged.'); event.currentTarget.reset(); }}><Select label="High-risk student" name="student_id" required><option value="">Choose student</option>{(data?.students || []).map((student) => <option key={student._id} value={student._id}>{student.name} · {student.roll_no}</option>)}</Select><Select label="Type" name="intervention_type"><option value="counseling">Counseling</option><option value="academic">Academic support</option><option value="attendance">Attendance</option><option value="other">Other</option></Select><Input label="Notes" name="notes" required /><button className="glass-button self-end bg-white px-4 py-3 text-black">Log intervention</button></form><Table headers={['Student', 'Type', 'Notes', 'Status', 'Update']} rows={(data?.interventions || []).map((item) => [item.student_name || 'Student', item.intervention_type, item.notes, item.status, <Select key={`status-${item._id}`} label="" value={item.status} onChange={(event) => submit(`/admin/interventions/${item._id}/status`, { status: event.target.value }, 'Intervention updated.')}><option value="active">Active</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></Select>])} /></div>;
+  const renderInterventions = () => <InterventionsPanel data={data} submit={submit} />;
 
   const renderDepartments = () => <DepartmentsPanel data={data} submit={submit} />;
 
@@ -1002,6 +1002,127 @@ function DepartmentsPanel({ data, submit }) {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+function InterventionsPanel({ data, submit }) {
+  const [dept, setDept] = useState('');
+  const [classN, setClassN] = useState('');
+  const [selStudent, setSelStudent] = useState('');
+  const [intType, setIntType] = useState('counseling');
+  const [notes, setNotes] = useState('');
+  const [allDepts, setAllDepts] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [msg, setMsg] = useState('');
+  const [interventions, setInterventions] = useState(data?.interventions || []);
+
+  useEffect(() => {
+    api.get('/admin/api/departments').then(r => setAllDepts(r.data.departments || [])).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!dept) { setClasses([]); setClassN(''); setStudents([]); return; }
+    api.get(`/admin/api/departments/classes?department=${encodeURIComponent(dept)}`)
+      .then(r => setClasses(r.data.classes || [])).catch(() => setClasses([]));
+  }, [dept]);
+
+  useEffect(() => {
+    if (!dept || !classN) { setStudents([]); return; }
+    api.get(`/admin/api/interventions/students?department=${encodeURIComponent(dept)}&class_name=${encodeURIComponent(classN)}`)
+      .then(r => setStudents(r.data.students || [])).catch(() => setStudents([]));
+  }, [dept, classN]);
+
+  const logIntervention = async (e) => {
+    e.preventDefault();
+    if (!selStudent || !notes.trim()) return;
+    setMsg('');
+    try {
+      await api.post('/admin/interventions/add', { student_id: selStudent, intervention_type: intType, notes });
+      setMsg('Intervention logged.');
+      setNotes('');
+      setSelStudent('');
+      const { data: res } = await api.get('/admin/interventions');
+      setInterventions(res.interventions || []);
+    } catch (err) { setMsg(err.response?.data?.message || 'Failed.'); }
+  };
+
+  const updateStatus = async (id, status) => {
+    await api.post(`/admin/interventions/${id}/status`, { status });
+    setInterventions(prev => prev.map(iv => iv._id === id ? { ...iv, status } : iv));
+  };
+
+  return (
+    <div className="space-y-6">
+      {msg && <p className="text-sm text-emerald-600 font-medium">{msg}</p>}
+
+      {/* Log Form */}
+      <form onSubmit={logIntervention} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <label className="block space-y-2 text-sm font-medium text-gray-700">
+          Department
+          <select className="glass-input" value={dept} onChange={e => { setDept(e.target.value); setClassN(''); setSelStudent(''); }} required>
+            <option value="">Select department</option>
+            {allDepts.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </label>
+        <label className="block space-y-2 text-sm font-medium text-gray-700">
+          Class
+          <select className="glass-input" value={classN} onChange={e => { setClassN(e.target.value); setSelStudent(''); }} disabled={!dept} required>
+            <option value="">{!dept ? 'Select dept first' : classes.length ? 'Select class' : 'No classes'}</option>
+            {classes.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </label>
+        <label className="block space-y-2 text-sm font-medium text-gray-700">
+          High-risk Student
+          <select className="glass-input" value={selStudent} onChange={e => setSelStudent(e.target.value)} disabled={!classN} required>
+            <option value="">{!classN ? 'Select class first' : students.length ? 'Select student' : 'No high-risk students'}</option>
+            {students.map(s => <option key={s._id} value={s._id}>{s.name} · {s.roll_no}</option>)}
+          </select>
+        </label>
+        <label className="block space-y-2 text-sm font-medium text-gray-700">
+          Type
+          <select className="glass-input" value={intType} onChange={e => setIntType(e.target.value)}>
+            <option value="counseling">Counseling</option>
+            <option value="academic">Academic support</option>
+            <option value="attendance">Attendance</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label className="block space-y-2 text-sm font-medium text-gray-700 sm:col-span-2 lg:col-span-3">
+          Notes
+          <input className="glass-input" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Describe the support action" required />
+        </label>
+        <button className="glass-button self-end bg-white px-4 py-3 text-black">Log intervention</button>
+      </form>
+
+      {/* Interventions Table */}
+      <Table
+        headers={['Student', 'Type', 'Notes', 'Course Attendance', 'Status', 'Update']}
+        rows={interventions.map(item => [
+          item.student_name || 'Student',
+          item.intervention_type,
+          item.notes,
+          item.courses_attendance?.length
+            ? <div key={`ca-${item._id}`} className="space-y-0.5">
+                {item.courses_attendance.map((c, i) => (
+                  <div key={i} className="text-xs">
+                    <span className="text-gray-500">{c.subject}:</span>{' '}
+                    <span className={c.percentage < 75 ? 'text-red-500 font-semibold' : 'text-emerald-600'}>{c.percentage}%</span>
+                  </div>
+                ))}
+              </div>
+            : <span className="text-gray-400 text-xs">—</span>,
+          item.status,
+          <select key={`st-${item._id}`} className="glass-input text-xs py-1" value={item.status}
+            onChange={e => updateStatus(item._id, e.target.value)}>
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        ])}
+      />
+      {!interventions.length && <Empty>No interventions logged yet.</Empty>}
     </div>
   );
 }
