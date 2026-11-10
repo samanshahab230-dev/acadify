@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Activity, ArrowRight, Brain, CheckCircle2, Cpu, Database, Gauge, Lock, ScanFace, Shield, Sparkles, Users, Zap } from 'lucide-react';
 import Navbar from '../../components/Navbar';
@@ -87,26 +86,26 @@ export default function Landing() {
 
           <div className="mx-auto max-w-6xl px-6 md:px-8">
 
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            <div}}
               className="mb-6 inline-flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-widest text-green-700">
               <span className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
               Acadify Intelligence Engine v2.0
-            </motion.div>
+            </div>
 
-            <motion.h1 initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
+            <h1}}}
               className="max-w-4xl text-5xl font-black tracking-[-0.04em] text-gray-900 md:text-7xl">
               Build the future of
               <span className="block bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 bg-clip-text text-transparent mt-1">
                 intelligent education.
               </span>
-            </motion.h1>
+            </h1>
 
-            <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14 }}
+            <p}}}
               className="mt-6 max-w-2xl text-lg text-gray-700 drop-shadow-sm">
               A unified ecosystem featuring biometric facial attendance, predictive GPA modeling, and automated student risk analysis for modern institutions.
-            </motion.p>
+            </p>
 
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+            <div}}}
               className="mt-8 flex flex-col gap-4 sm:flex-row">
               <Link to="/login"
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-green-600 px-7 py-4 text-sm font-semibold text-white shadow-[0_4px_20px_rgba(22,163,74,0.35)] hover:shadow-[0_4px_28px_rgba(22,163,74,0.5)] hover:-translate-y-0.5 transition-all duration-200">
@@ -116,10 +115,10 @@ export default function Landing() {
                 className="inline-flex items-center justify-center rounded-full border border-green-200 bg-white px-7 py-4 text-sm font-medium text-gray-600 hover:border-green-300 hover:text-green-700 transition-colors">
                 Explore Features
               </a>
-            </motion.div>
+            </div>
 
             {/* Metrics */}
-            <motion.div initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.26 }}
+            <div}}}
               className="mt-14 grid max-w-3xl gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {metrics.map(m => (
                 <div key={m.label} className="rounded-2xl border border-green-100 bg-white p-5 shadow-[0_2px_12px_rgba(20,83,45,0.06)]">
@@ -127,7 +126,7 @@ export default function Landing() {
                   <div className="mt-1.5 text-xs uppercase tracking-widest text-gray-400">{m.label}</div>
                 </div>
               ))}
-            </motion.div>
+            </div>
           </div>
         </section>
 
@@ -147,24 +146,24 @@ export default function Landing() {
         {/* ── Features ── */}
         <section id="features" className="bg-gradient-to-b from-white to-emerald-50/60 px-6 py-24 md:px-8">
           <div className="mx-auto max-w-6xl">
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+          <div}}}
             className="mx-auto max-w-2xl text-center mb-14">
             <p className="text-xs font-semibold uppercase tracking-widest text-green-600 mb-4">Why Acadify</p>
             <h2 className="text-4xl font-bold tracking-tight text-gray-900 md:text-5xl">
               Intelligence designed for every campus decision.
             </h2>
-          </motion.div>
+          </div>
 
           <div className="grid gap-6 lg:grid-cols-3">
             {featureCards.map(({ icon: Icon, title, description, color, bg }, i) => (
-              <motion.article key={title} initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.08 }}
+              <article key={title}}}}}
                 className="group rounded-3xl border border-green-100 bg-white p-8 shadow-[0_4px_24px_rgba(20,83,45,0.06)] hover:shadow-[0_8px_32px_rgba(20,83,45,0.12)] hover:-translate-y-1 transition-all duration-300">
                 <div className={`mb-5 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${color} shadow-[0_4px_12px_rgba(22,163,74,0.25)]`}>
                   <Icon className="h-5 w-5 text-white" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">{title}</h3>
                 <p className="text-sm leading-7 text-gray-500">{description}</p>
-              </motion.article>
+              </article>
             ))}
           </div>
           </div>
@@ -173,7 +172,7 @@ export default function Landing() {
         {/* ── AI Models ── */}
         <section id="ai-models" className="bg-gradient-to-br from-emerald-900 via-green-900 to-teal-900 py-24 border-y border-green-800">
           <div className="mx-auto grid max-w-6xl gap-12 px-6 md:px-8 lg:grid-cols-2 lg:items-center">
-            <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
+            <div}}}>
               <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400 mb-4">AI Model Stack</p>
               <h2 className="text-4xl font-bold tracking-tight text-white mb-5">
                 Built to understand behavior before it becomes a problem.
@@ -194,9 +193,9 @@ export default function Landing() {
                   </div>
                 ))}
               </div>
-            </motion.div>
+            </div>
 
-            <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}
+            <div}}}
               className="rounded-3xl border border-green-100 bg-white p-6 shadow-[0_8px_40px_rgba(20,83,45,0.10)]">
               <div className="mb-4 flex items-center gap-2 border-b border-gray-100 pb-4 text-sm text-gray-400">
                 <span className="h-3 w-3 rounded-full bg-red-400" />
@@ -224,38 +223,38 @@ export default function Landing() {
                   <div className="mt-2 text-2xl font-black text-green-600">+41%</div>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         </section>
 
         {/* ── About ── */}
         <section id="about" className="py-24 bg-gradient-to-b from-white via-green-50/40 to-white">
           <div className="mx-auto max-w-6xl px-6 md:px-8">
-            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+            <div}}}
               className="mx-auto max-w-3xl text-center mb-14">
               <p className="text-xs font-semibold uppercase tracking-widest text-green-600 mb-4">About Acadify</p>
               <h2 className="text-4xl font-bold tracking-tight text-gray-900 md:text-5xl">
                 The missing layer between student data and institutional action.
               </h2>
-            </motion.div>
+            </div>
 
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4 mb-16">
               {metrics.map((m, i) => (
-                <motion.div key={m.label} initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.08 }}
+                <div key={m.label}}}}}
                   className="rounded-3xl border border-green-100 bg-white p-6 shadow-sm text-center">
                   <div className="text-4xl font-black text-green-600">{m.value}</div>
                   <div className="mt-3 text-xs uppercase tracking-widest text-gray-400">{m.label}</div>
-                </motion.div>
+                </div>
               ))}
             </div>
 
             <div className="grid gap-6 lg:grid-cols-2 lg:items-center">
-              <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}
+              <div}}}
                 className="overflow-hidden rounded-3xl border border-green-100 shadow-sm h-72 lg:h-auto">
                 <img src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=1200&auto=format&fit=crop"
                   alt="Students collaborating" className="h-full w-full object-cover" />
-              </motion.div>
-              <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}
+              </div>
+              <div}}}
                 className="rounded-3xl border border-green-100 bg-white p-8 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-widest text-green-600 mb-4">Institutional Impact</p>
                 <h3 className="text-2xl font-bold text-gray-900 mb-6">From attendance to intervention, in one intelligent flow.</h3>
@@ -269,7 +268,7 @@ export default function Landing() {
                     </li>
                   ))}
                 </ul>
-              </motion.div>
+              </div>
             </div>
           </div>
         </section>
@@ -277,7 +276,7 @@ export default function Landing() {
         {/* ── Security ── */}
         <section id="security" className="border-t border-green-200 bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 py-24">
           <div className="mx-auto grid max-w-6xl gap-6 px-6 md:px-8 lg:grid-cols-3">
-            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+            <div}}}
               className="rounded-3xl border border-white/20 bg-white/15 backdrop-blur-sm p-8 shadow-sm lg:col-span-2">
               <div className="flex items-center gap-2 text-emerald-200 mb-5">
                 <Sparkles className="h-5 w-5" />
@@ -289,21 +288,21 @@ export default function Landing() {
               <p className="text-green-100/80">
                 Every record, risk signal, and biometric model runs through a privacy-first governance layer built for educational institutions.
               </p>
-            </motion.div>
-            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.08 }}
+            </div>
+            <div}}}}
               className="rounded-3xl border border-white/20 bg-white/20 backdrop-blur-sm p-8">
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 border border-white/30">
                 <Lock className="h-5 w-5 text-white" />
               </div>
               <div className="text-xs uppercase tracking-widest text-green-200 mb-3">Protected</div>
               <div className="text-2xl font-bold text-white">Zero-trust campus model</div>
-            </motion.div>
+            </div>
           </div>
         </section>
 
         {/* ── CTA ── */}
         <section className="mx-auto max-w-6xl px-6 py-24 md:px-8">
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+          <div}}}
             className="rounded-3xl border border-green-200 bg-gradient-to-br from-green-50 via-white to-emerald-50 p-10 shadow-[0_8px_40px_rgba(20,83,45,0.10)] md:p-14">
             <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-2xl">
@@ -323,7 +322,7 @@ export default function Landing() {
                 </a>
               </div>
             </div>
-          </motion.div>
+          </div>
         </section>
       </main>
 

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, ArrowRight, ArrowLeft, CheckCircle } from 'lucide-react';
 import api from '../../services/api';
 import Navbar from '../../components/Navbar';
@@ -56,12 +55,7 @@ export default function ForgotPassword() {
       <div className="absolute top-[20%] left-[20%] w-96 h-96 bg-white/5 rounded-full blur-[100px] pointer-events-none" />
       <div className="absolute bottom-[20%] right-[20%] w-96 h-96 bg-white/5 rounded-full blur-[100px] pointer-events-none" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md"
-      >
+      <div className="w-full max-w-md">
         <div className="glass-card p-8">
 
           {/* Success State */}
@@ -101,22 +95,15 @@ export default function ForgotPassword() {
               </div>
 
               {error && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl mb-5 text-sm"
-                >
+                <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl mb-5 text-sm">
                   {error}
-                </motion.div>
+                </div>
               )}
 
-              <AnimatePresence mode="wait">
+              <>
                 {step === 1 && (
-                  <motion.form
+                  <form
                     key="step1"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
                     onSubmit={handleRequestReset}
                     className="space-y-5"
                   >
@@ -141,15 +128,12 @@ export default function ForgotPassword() {
                     >
                       {loading ? 'Checking...' : <><span>Continue</span><ArrowRight className="w-4 h-4" /></>}
                     </button>
-                  </motion.form>
+                  </form>
                 )}
 
                 {step === 2 && (
-                  <motion.form
+                  <form
                     key="step2"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
                     onSubmit={handleResetPassword}
                     className="space-y-5"
                   >
@@ -192,9 +176,9 @@ export default function ForgotPassword() {
                     <button type="button" onClick={() => { setStep(1); setError(''); }} className="w-full flex items-center justify-center gap-1 text-sm text-secondary hover:text-white transition-colors">
                       <ArrowLeft className="w-3.5 h-3.5" /> Back
                     </button>
-                  </motion.form>
+                  </form>
                 )}
-              </AnimatePresence>
+              </>
 
               <div className="mt-7 text-center text-sm text-secondary">
                 Remember your password?{' '}
@@ -203,7 +187,7 @@ export default function ForgotPassword() {
             </>
           )}
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

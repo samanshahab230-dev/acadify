@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { User, Lock, Mail, Hash, BookOpen, GraduationCap, ArrowRight } from 'lucide-react';
 import api from '../../services/api';
 import Navbar from '../../components/Navbar';
@@ -62,10 +61,10 @@ export default function Register() {
       <div className="absolute top-[20%] right-[20%] w-96 h-96 bg-white/5 rounded-full blur-[100px] pointer-events-none" />
       <div className="absolute bottom-[20%] left-[20%] w-96 h-96 bg-white/5 rounded-full blur-[100px] pointer-events-none" />
 
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
+      <div 
+       }
+       }
+       }
         className="w-full max-w-xl"
       >
         <div className="glass-card p-8">
@@ -75,13 +74,13 @@ export default function Register() {
           </div>
 
           {error && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
+            <div 
+             }
+             }
               className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg mb-6 text-sm"
             >
               {error}
-            </motion.div>
+            </div>
           )}
 
           <form onSubmit={handleRegister} className="space-y-4">
@@ -165,7 +164,7 @@ export default function Register() {
             </Link>
           </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

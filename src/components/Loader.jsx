@@ -1,120 +1,59 @@
 import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Loader({ onDone }) {
   const [exit, setExit] = useState(false);
 
   useEffect(() => {
-    const t1 = setTimeout(() => setExit(true), 2600);
-    const t2 = setTimeout(() => onDone(), 3200);
+    const t1 = setTimeout(() => setExit(true), 2400);
+    const t2 = setTimeout(() => onDone(), 2800);
     return () => [t1, t2].forEach(clearTimeout);
   }, []);
 
-  const letters = 'Acadify'.split('');
-
   return (
-    <AnimatePresence>
-      {!exit ? (
-        <motion.div
-          key="loader"
-          exit={{ opacity: 0, scale: 1.05 }}
-          transition={{ duration: 0.6, ease: 'easeInOut' }}
-          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden"
-          style={{ background: '#f8faf8' }}
-        >
-          {/* Animated green rings */}
-          {[1, 2, 3].map(i => (
-            <motion.div
-              key={i}
-              className="absolute rounded-full border border-emerald-200"
-              initial={{ width: 80, height: 80, opacity: 0.6 }}
-              animate={{ width: 80 + i * 140, height: 80 + i * 140, opacity: 0 }}
-              transition={{ duration: 2, delay: i * 0.3, repeat: Infinity, ease: 'easeOut' }}
-            />
-          ))}
+    <div className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-opacity duration-500 ${exit ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+      style={{ background: '#f8faf8' }}>
 
-          {/* Center logo */}
-          <motion.div
-            initial={{ scale: 0, rotate: -20, opacity: 0 }}
-            animate={{ scale: 1, rotate: 0, opacity: 1 }}
-            transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
-            className="relative z-10 flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-emerald-400 to-green-600 shadow-[0_8px_40px_rgba(22,163,74,0.45)] mb-8"
-          >
-            <svg width="44" height="44" viewBox="0 0 24 24" fill="none">
-              <motion.path
-                d="M12 2L2 7l10 5 10-5-10-5z"
-                fill="white"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-              />
-              <motion.path
-                d="M2 17l10 5 10-5"
-                stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ delay: 0.5, duration: 0.5 }}
-              />
-              <motion.path
-                d="M2 12l10 5 10-5"
-                stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ delay: 0.7, duration: 0.5 }}
-              />
-            </svg>
+      {/* Rings */}
+      {[1, 2, 3].map(i => (
+        <div key={i} className="absolute rounded-full border border-emerald-200 animate-ping"
+          style={{ width: 80 + i * 120, height: 80 + i * 120, animationDelay: `${i * 0.3}s`, animationDuration: '2s', opacity: 0.4 }} />
+      ))}
 
-            {/* Glow pulse */}
-            <motion.div
-              className="absolute inset-0 rounded-3xl bg-emerald-400"
-              animate={{ opacity: [0, 0.3, 0] }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-            />
-          </motion.div>
+      {/* Logo */}
+      <div className="relative z-10 flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-emerald-400 to-green-600 shadow-[0_8px_40px_rgba(22,163,74,0.45)] mb-8"
+        style={{ animation: 'scaleIn 0.6s cubic-bezier(0.34,1.56,0.64,1) forwards' }}>
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L2 7l10 5 10-5-10-5z" fill="white" />
+          <path d="M2 17l10 5 10-5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M2 12l10 5 10-5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
 
-          {/* Staggered letter reveal */}
-          <div className="relative z-10 flex items-center gap-[2px] mb-3">
-            {letters.map((l, i) => (
-              <motion.span
-                key={i}
-                initial={{ opacity: 0, y: 20, filter: 'blur(8px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                transition={{ delay: 0.6 + i * 0.07, duration: 0.4, ease: 'easeOut' }}
-                className="text-5xl font-black tracking-tight text-gray-900"
-              >
-                {l}
-              </motion.span>
-            ))}
-          </div>
+      {/* Title */}
+      <div className="relative z-10 text-5xl font-black tracking-tight text-gray-900 mb-3"
+        style={{ animation: 'fadeUp 0.5s 0.5s ease-out both' }}>
+        Acadify
+      </div>
 
-          {/* Subtitle */}
-          <motion.p
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.3, duration: 0.5 }}
-            className="relative z-10 text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 mb-10"
-          >
-            Intelligence Engine
-          </motion.p>
+      {/* Subtitle */}
+      <p className="relative z-10 text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600 mb-10"
+        style={{ animation: 'fadeUp 0.5s 0.9s ease-out both' }}>
+        Intelligence Engine
+      </p>
 
-          {/* Animated dots */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1.5 }}
-            className="relative z-10 flex gap-2"
-          >
-            {[0, 1, 2].map(i => (
-              <motion.div
-                key={i}
-                className="w-2 h-2 rounded-full bg-emerald-500"
-                animate={{ y: [0, -8, 0], opacity: [0.4, 1, 0.4] }}
-                transition={{ duration: 0.8, delay: i * 0.15, repeat: Infinity, ease: 'easeInOut' }}
-              />
-            ))}
-          </motion.div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
+      {/* Dots */}
+      <div className="relative z-10 flex gap-2" style={{ animation: 'fadeUp 0.4s 1.2s ease-out both' }}>
+        {[0, 1, 2].map(i => (
+          <div key={i} className="w-2 h-2 rounded-full bg-emerald-500"
+            style={{ animation: `bounce 0.8s ${i * 0.15}s ease-in-out infinite` }} />
+        ))}
+      </div>
+
+      <style>{`
+        @keyframes scaleIn { from { transform: scale(0) rotate(-20deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+        @keyframes fadeUp  { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes bounce  { 0%,100% { transform: translateY(0); opacity: 0.4; } 50% { transform: translateY(-8px); opacity: 1; } }
+      `}</style>
+    </div>
   );
 }

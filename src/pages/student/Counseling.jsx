@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
 import { ShieldAlert, Clock, Send } from 'lucide-react';
 import api from '../../services/api';
 
@@ -87,7 +86,7 @@ export default function Counseling() {
         <div className="space-y-4">
           <h3 className="font-semibold px-2">Previous Requests</h3>
           {requests?.length > 0 ? requests.map(req => (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={req._id} className="glass-card p-5">
+            <div}} key={req._id} className="glass-card p-5">
               <div className="flex justify-between items-start mb-3">
                 <h4 className="font-semibold">{req.subject}</h4>
                 <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${req.status === 'resolved' ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
@@ -103,7 +102,7 @@ export default function Counseling() {
                 <span className="flex items-center gap-1"><Clock className="w-4 h-4"/> {req.created_at}</span>
                 <span className="uppercase">{req.urgency} Priority</span>
               </div>
-            </motion.div>
+            </div>
           )) : (
             <div className="glass-card p-8 text-center text-secondary border-dashed border-white/10">No support requests history.</div>
           )}

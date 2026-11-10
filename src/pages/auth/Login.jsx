@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { Lock, Mail, ArrowRight } from 'lucide-react';
 import api from '../../services/api';
 
@@ -89,12 +88,7 @@ export default function Login() {
 
       {/* Right — Form Panel */}
       <div className="flex flex-1 items-center justify-center bg-white px-6 py-12">
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
-          className="w-full max-w-sm"
-        >
+        <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <Link to="/" className="flex lg:hidden items-center gap-2.5 mb-8 justify-center">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-green-600">
@@ -113,13 +107,9 @@ export default function Login() {
           </div>
 
           {error && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-6 text-sm"
-            >
+            <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-6 text-sm">
               {error}
-            </motion.div>
+            </div>
           )}
 
           <form onSubmit={handleLogin} className="space-y-5">
@@ -170,7 +160,7 @@ export default function Login() {
           <p className="mt-8 text-center text-xs text-gray-400">
             Access is managed by your institution administrator.
           </p>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
