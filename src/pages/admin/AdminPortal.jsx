@@ -216,10 +216,13 @@ function UsersPanel({ data, reload, submit }) {
   const [editUser, setEditUser] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [assignTeacher, setAssignTeacher] = useState(null);
-  const [selectedStudents, setSelectedStudents] = useState([]);
-  const [teacherSubjects, setTeacherSubjects] = useState([]);
-  const [allSubjects, setAllSubjects] = useState([]);
-  const [deptFilter, setDeptFilter] = useState('');
+  const [assignedCourses, setAssignedCourses] = useState([]);
+  const [assignedCount, setAssignedCount] = useState(0);
+  const [dept, setDept] = useState('');
+  const [classN, setClassN] = useState('');
+  const [allDepts, setAllDepts] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [courses, setCourses] = useState([]);
   const [msg, setMsg] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -245,38 +248,55 @@ function UsersPanel({ data, reload, submit }) {
 
   const openAssign = async (teacher) => {
     setAssignTeacher(teacher);
-    setDeptFilter('');
+    setDept(''); setClassN(''); setClasses([]); setCourses([]);
     setMsg('');
+    // Load depts
+    api.get('/admin/api/departments').then(r => setAllDepts(r.data.departments || [])).catch(() => {});
+    // Load current assigned courses
     try {
       const { data: res } = await api.get(`/admin/users/${teacher.id}/detail`);
-      setSelectedStudents(res.assigned_student_ids || []);
-      setTeacherSubjects(res.teacher_subjects || []);
-      setAllSubjects(res.all_subjects || []);
-    } catch {
-      const assigned = (data?.students || []).filter(s => s.teacher_ids?.includes(teacher.id)).map(s => s._id);
-      setSelectedStudents(assigned);
-      setTeacherSubjects([]);
-      setAllSubjects([]);
-    }
+      setAssignedCourses(res.assigned_courses || []);
+      setAssignedCount(res.assigned_student_count || 0);
+    } catch { setAssignedCourses([]); setAssignedCount(0); }
   };
 
-  const saveAssign = async () => {
+  const onDeptChange = async (d) => {
+    setDept(d); setClassN(''); setCourses([]);
+    if (!d) { setClasses([]); return; }
+    const { data: res } = await api.get(`/admin/api/departments/classes?department=${encodeURIComponent(d)}`);
+    setClasses(res.classes || []);
+  };
+
+  const onClassChange = async (c) => {
+    setClassN(c); setCourses([]);
+    if (!c || !dept) return;
+    const { data: res } = await api.get(`/admin/api/courses?department=${encodeURIComponent(dept)}`);
+    setCourses((res.courses || []).filter(co => co.class_name === c));
+  };
+
+  const assignStudents = async () => {
+    if (!dept || !classN) return;
     setSaving(true); setMsg('');
     try {
-      const { data: res } = await api.post(`/admin/users/${assignTeacher.id}/assign-students`, { student_ids: selectedStudents });
-      setMsg(res.message); reload();
-      // Refresh subjects after save
-      const { data: detail } = await api.get(`/admin/users/${assignTeacher.id}/detail`);
-      setTeacherSubjects(detail.teacher_subjects || []);
-      setAssignTeacher(prev => ({ ...prev, student_count: selectedStudents.length }));
+      const { data: res } = await api.post(`/admin/users/${assignTeacher.id}/assign-students`, { department: dept, class_name: classN });
+      setMsg(res.message);
+      setAssignedCount(res.count || 0);
+      reload();
     } catch (err) { setMsg(err.response?.data?.message || 'Could not assign.'); }
     finally { setSaving(false); }
   };
 
-  const toggleStudent = (id) => setSelectedStudents(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
-
-  const allDepts = [...new Set((data?.students || []).map(s => s.department).filter(Boolean))].sort();
-  const filteredStudents = deptFilter ? (data?.students || []).filter(s => s.department === deptFilter) : (data?.students || []);
+  const assignCourseTeacher = async (courseId, teacherId) => {
+    setMsg('');
+    try {
+      await api.post(`/admin/api/courses/${courseId}/assign-teacher`, { teacher_id: teacherId });
+      setAssignedCourses(prev => prev.map(c => c._id === courseId ? { ...c, _assigned: true } : c));
+      // Refresh assigned courses
+      const { data: res } = await api.get(`/admin/users/${assignTeacher.id}/detail`);
+      setAssignedCourses(res.assigned_courses || []);
+      setMsg('Teacher assigned to course.');
+    } catch (err) { setMsg(err.response?.data?.message || 'Failed.'); }
+  };
 
   const teachers = (data?.users || []).filter(u => u.role === 'teacher');
   const parents = (data?.users || []).filter(u => u.role === 'parent');
@@ -284,7 +304,7 @@ function UsersPanel({ data, reload, submit }) {
 
   return (
     <div className="space-y-6">
-      {msg && <p className="text-sm text-emerald-600 font-medium bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-lg">{msg}</p>}
+      {msg && !assignTeacher && <p className="text-sm text-emerald-600 font-medium bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-lg">{msg}</p>}
 
       <CreateRoleAccount onCreated={reload} />
 
@@ -297,7 +317,7 @@ function UsersPanel({ data, reload, submit }) {
             u.name, u.email,
             <span key={u.id} className="text-indigo-600 font-medium">{u.student_count ?? 0} students</span>,
             <span key={u.id + 'a'} className="flex gap-3">
-              <button onClick={() => openAssign(u)} className="text-indigo-600 font-medium hover:underline">Assign Students</button>
+              <button onClick={() => openAssign(u)} className="text-indigo-600 font-medium hover:underline">Assign</button>
               <button onClick={() => openEdit(u)} className="text-amber-600 font-medium hover:underline">Edit</button>
               <button onClick={() => deleteUser(u)} className="text-red-600 font-medium hover:underline">Delete</button>
             </span>
@@ -345,52 +365,78 @@ function UsersPanel({ data, reload, submit }) {
         </div>
       )}
 
-      {/* Assign Students Modal */}
+      {/* Assign Modal */}
       {assignTeacher && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="glass-card p-6 w-full max-w-2xl space-y-4 max-h-[85vh] flex flex-col">
-            <div className="flex items-start justify-between">
+          <div className="glass-card p-6 w-full max-w-2xl space-y-5 max-h-[90vh] flex flex-col">
+            <div className="flex items-start justify-between shrink-0">
               <div>
-                <h3 className="font-semibold text-lg">Assign Students — {assignTeacher.name}</h3>
-                <p className="text-sm text-secondary mt-1">{selectedStudents.length} selected · Subjects auto-seeded on save</p>
+                <h3 className="font-semibold text-lg">Assign — {assignTeacher.name}</h3>
+                <p className="text-sm text-secondary mt-1">{assignedCount} students currently assigned</p>
               </div>
               <button onClick={() => setAssignTeacher(null)} className="text-secondary hover:text-white text-xl leading-none">✕</button>
             </div>
 
-            {/* Current Subjects */}
-            {teacherSubjects.length > 0 && (
-              <div className="bg-white/5 rounded-lg px-4 py-3">
-                <p className="text-xs text-secondary uppercase mb-2">Current subjects ({teacherSubjects.length})</p>
-                <div className="flex flex-wrap gap-2">
-                  {teacherSubjects.map(s => <span key={s} className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded">{s}</span>)}
-                </div>
+            {msg && <p className="text-sm text-emerald-400 shrink-0">{msg}</p>}
+
+            {/* Section 1: Assign Students by Dept+Class */}
+            <div className="space-y-3 shrink-0">
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Assign Students by Class</p>
+              <div className="grid grid-cols-2 gap-3">
+                <select className="glass-input" value={dept} onChange={e => onDeptChange(e.target.value)}>
+                  <option value="">Select Department</option>
+                  {allDepts.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <select className="glass-input" value={classN} onChange={e => onClassChange(e.target.value)} disabled={!dept}>
+                  <option value="">{!dept ? 'Select dept first' : classes.length ? 'Select Class' : 'No classes'}</option>
+                  {classes.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
-            )}
-
-            {/* Department Filter */}
-            <div className="flex gap-3 items-center">
-              <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className="glass-input text-sm flex-1">
-                <option value="">All departments</option>
-                {allDepts.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-              <button onClick={() => setSelectedStudents(filteredStudents.map(s => s._id))} className="glass-button px-3 py-2 text-sm">Select all</button>
-              <button onClick={() => setSelectedStudents([])} className="glass-button px-3 py-2 text-sm">Clear</button>
+              <button disabled={!dept || !classN || saving} onClick={assignStudents}
+                className="glass-button bg-white text-black px-4 py-2 text-sm disabled:opacity-40">
+                {saving ? 'Assigning...' : `Assign all students of ${classN || 'selected class'}`}
+              </button>
             </div>
 
-            {/* Students List */}
-            <div className="overflow-y-auto flex-1 space-y-1 border border-white/10 rounded-lg p-3">
-              {filteredStudents.map(s => (
-                <label key={s._id} className="flex items-center gap-3 py-1.5 text-sm hover:bg-white/5 px-2 rounded cursor-pointer">
-                  <input type="checkbox" checked={selectedStudents.includes(s._id)} onChange={() => toggleStudent(s._id)} />
-                  <span>{s.name} <span className="text-secondary">· {s.roll_no} · {s.department}</span></span>
-                </label>
-              ))}
+            {/* Section 2: Assign Teacher to Courses */}
+            <div className="space-y-3 overflow-y-auto flex-1">
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Assign to Course</p>
+              {courses.length > 0 ? (
+                <div className="space-y-2">
+                  {courses.map(c => (
+                    <div key={c._id} className="flex items-center justify-between border border-white/10 rounded-lg px-3 py-2">
+                      <div>
+                        <p className="text-sm font-medium">{c.subject}</p>
+                        <p className="text-xs text-secondary">{c.class_name} · {c.enrolled_count} students · {c.teacher_name || 'No teacher'}</p>
+                      </div>
+                      <button onClick={() => assignCourseTeacher(c._id, assignTeacher.id)}
+                        className="glass-button px-3 py-1.5 text-xs bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/40">
+                        Assign me
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-secondary">{classN ? 'No courses in this class.' : 'Select a class above to see courses.'}</p>
+              )}
+
+              {/* Currently assigned courses */}
+              {assignedCourses.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs text-secondary uppercase mb-2">Currently assigned courses ({assignedCourses.length})</p>
+                  <div className="flex flex-wrap gap-2">
+                    {assignedCourses.map(c => (
+                      <span key={c._id} className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded">
+                        {c.subject} · {c.class_name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {msg && <p className="text-sm text-cyan-300">{msg}</p>}
-            <div className="flex gap-3">
-              <button disabled={saving} onClick={saveAssign} className="glass-button bg-white px-4 py-2 text-black disabled:opacity-50">{saving ? 'Saving...' : 'Save assignments'}</button>
-              <button onClick={() => setAssignTeacher(null)} className="glass-button px-4 py-2">Cancel</button>
+            <div className="shrink-0">
+              <button onClick={() => setAssignTeacher(null)} className="glass-button px-4 py-2">Close</button>
             </div>
           </div>
         </div>

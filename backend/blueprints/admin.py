@@ -635,7 +635,7 @@ def user_delete(user_id):
 @login_required
 @role_required('admin')
 def user_assign_students(user_id):
-    """Assign/unassign students to a teacher."""
+    """Assign all students of a dept+class to a teacher."""
     db = get_db()
     user = User.get_by_id(user_id)
     if not user or user.role != 'teacher':
@@ -645,24 +645,23 @@ def user_assign_students(user_id):
     except Exception:
         return jsonify({'success': False, 'message': 'Invalid user ID.'}), 400
     data = request.get_json(silent=True) or {}
-    student_ids = data.get('student_ids', [])
-    try:
-        sid_objects = [ObjectId(s) for s in student_ids]
-    except Exception:
-        return jsonify({'success': False, 'message': 'Invalid student ID.'}), 400
-    # Remove teacher from all, then add to selected
-    db.students.update_many({}, {'$pull': {'teacher_ids': uid}})
-    if sid_objects:
-        db.students.update_many({'_id': {'$in': sid_objects}}, {'$addToSet': {'teacher_ids': uid}})
-        # Seed subjects for newly assigned students
-        from models.attendance import AttendanceModel
-        for s in db.students.find({'_id': {'$in': sid_objects}}):
-            if not AttendanceModel.get_subjects(s['_id']):
-                AttendanceModel.seed_subjects(s['_id'], s.get('department', ''), s.get('semester', 1))
-    count = db.students.count_documents({'teacher_ids': uid})
+    department = (data.get('department') or '').strip()
+    class_name = (data.get('class_name') or '').strip()
+    if not department or not class_name:
+        return jsonify({'success': False, 'message': 'Department and class are required.'}), 400
+    # Get all students enrolled in any course of this dept+class
+    courses = list(db.courses.find({'department': department, 'class_name': class_name}))
+    course_ids = [c['_id'] for c in courses]
+    student_ids = db.course_enrollments.distinct('student_id', {'course_id': {'$in': course_ids}})
+    if not student_ids:
+        return jsonify({'success': False, 'message': 'No students found in this class.'}), 404
+    # Remove teacher from all students first, then assign to this class
+    db.students.update_many({'teacher_ids': uid}, {'$pull': {'teacher_ids': uid}})
+    db.students.update_many({'_id': {'$in': student_ids}}, {'$addToSet': {'teacher_ids': uid}})
+    count = len(student_ids)
     AuditLogModel.log_action(current_user.name, 'TEACHER_STUDENTS_ASSIGNED',
-                             f'Assigned {count} students to {user.email}')
-    return jsonify({'success': True, 'message': f'{count} students assigned to {user.name}.'})
+                             f'Assigned {count} students ({department} {class_name}) to {user.email}')
+    return jsonify({'success': True, 'message': f'{count} students from {class_name} assigned to {user.name}.', 'count': count})
 
 
 @admin_bp.route('/users/<user_id>/detail')
@@ -679,16 +678,21 @@ def user_detail(user_id):
         return jsonify({'success': False, 'message': 'Invalid ID.'}), 400
     assigned = list(db.students.find({'teacher_ids': uid}))
     assigned_ids = [str(s['_id']) for s in assigned]
-    all_subjects = sorted(db.attendance_subjects.distinct('subject'))
-    teacher_subjects = sorted(db.attendance_subjects.distinct(
-        'subject', {'student_id': {'$in': [s['_id'] for s in assigned]}}
-    )) if assigned else []
+    # Courses assigned to this teacher
+    assigned_courses = list(db.courses.find({'teacher_id': uid}))
+    courses_data = [{
+        '_id': str(c['_id']),
+        'subject': c.get('subject', ''),
+        'class_name': c.get('class_name', ''),
+        'department': c.get('department', ''),
+        'enrolled_count': db.course_enrollments.count_documents({'course_id': c['_id']})
+    } for c in assigned_courses]
     return jsonify({
         'success': True,
         'teacher': {'id': user.id, 'name': user.name, 'email': user.email},
         'assigned_student_ids': assigned_ids,
-        'teacher_subjects': teacher_subjects,
-        'all_subjects': all_subjects,
+        'assigned_student_count': len(assigned_ids),
+        'assigned_courses': courses_data,
     })
 
 
@@ -1244,6 +1248,28 @@ def api_course_create():
 def api_course_delete(course_id):
     CourseModel.delete(course_id)
     return jsonify({'success': True, 'message': 'Course deleted.'})
+
+
+@admin_bp.route('/api/courses/<course_id>/assign-teacher', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_course_assign_teacher(course_id):
+    """Assign a teacher to a course."""
+    db = get_db()
+    data = request.get_json(silent=True) or request.form
+    teacher_id = (data.get('teacher_id') or '').strip() or None
+    try:
+        cid = ObjectId(course_id)
+    except Exception:
+        return jsonify({'success': False, 'message': 'Invalid course ID.'}), 400
+    update = {'teacher_id': ObjectId(teacher_id) if teacher_id else None}
+    if teacher_id:
+        teacher = db.users.find_one({'_id': ObjectId(teacher_id)})
+        update['teacher_name'] = teacher.get('name', '') if teacher else ''
+    else:
+        update['teacher_name'] = ''
+    db.courses.update_one({'_id': cid}, {'$set': update})
+    return jsonify({'success': True, 'message': 'Teacher assigned.'})
 
 
 @admin_bp.route('/api/courses/<course_id>/enroll', methods=['POST'])
