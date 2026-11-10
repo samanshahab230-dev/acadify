@@ -55,16 +55,15 @@ def _assigned_student(student_id):
 @role_required('teacher')
 def dashboard():
     db = get_db()
-    students = list(db.students.find({'teacher_ids': current_user._id}).sort('name', 1))
+    try:
+        uid = ObjectId(current_user.id)
+    except Exception:
+        uid = current_user._id
+    students = list(db.students.find({'teacher_ids': uid}))
     result = []
     for student in students:
         user = db.users.find_one({'_id': student.get('user_id')})
         subjects = AttendanceModel.get_subjects(student['_id'])
-        if not subjects:
-            AttendanceModel.seed_subjects(
-                student['_id'], student.get('department', ''), student.get('semester', 1)
-            )
-            subjects = AttendanceModel.get_subjects(student['_id'])
         assignments = AssignmentModel.get_by_student(student['_id'])[:5]
         attendance_records = AttendanceModel.get_records(student['_id'], limit=5)
         result.append({
@@ -72,19 +71,14 @@ def dashboard():
             'name': user.get('name', 'Student') if user else 'Student',
             'roll_no': student.get('roll_no', ''),
             'department': student.get('department', ''),
-            'semester': student.get('semester', 1),
-            'gpa': round(float(student.get('gpa', 0)), 2),
+            'class_name': student.get('class_name', ''),
             'attendance_pct': round(float(student.get('attendance_pct', 0)), 2),
+            'risk_level': student.get('risk_level', 'LOW'),
             'subjects': [{'subject': s['subject'], 'attended': s.get('attended', 0), 'total_classes': s.get('total_classes', 0)} for s in subjects],
-            'assignments': [{
-                '_id': str(a['_id']), 'title': a.get('title', ''),
-                'subject': a.get('subject', ''), 'due_date': str(a.get('due_date', ''))
-            } for a in assignments],
-            'attendance_records': [{
-                'subject': r.get('subject', ''), 'status': r.get('status', ''),
-                'date': str(r.get('date', r.get('created_at', '')))[:10]
-            } for r in attendance_records],
+            'assignments': [{'_id': str(a['_id']), 'title': a.get('title', ''), 'subject': a.get('subject', ''), 'due_date': str(a.get('due_date', ''))} for a in assignments],
+            'attendance_records': [{'subject': r.get('subject', ''), 'status': r.get('status', ''), 'date': str(r.get('date', r.get('created_at', '')))[:10]} for r in attendance_records],
         })
+    result.sort(key=lambda x: x['name'])
     return jsonify({'success': True, 'students': result})
 
 
@@ -300,10 +294,13 @@ def student_marks(student_id):
 @login_required
 @role_required('teacher')
 def at_risk_students():
-    """Return at-risk students assigned to this teacher."""
     db = get_db()
+    try:
+        uid = ObjectId(current_user.id)
+    except Exception:
+        uid = current_user._id
     students = list(db.students.find({
-        'teacher_ids': current_user._id,
+        'teacher_ids': uid,
         'attendance_pct': {'$lt': 75.0}
     }).sort('attendance_pct', 1))
     result = []
