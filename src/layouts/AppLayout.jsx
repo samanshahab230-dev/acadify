@@ -71,16 +71,16 @@ export default function AppLayout() {
   const adminMenuItems = [
     { name: 'Command Center', icon: LayoutDashboard, path: '/admin/dashboard' },
     { name: 'Student Directory', icon: Users, path: '/admin/students' },
+    { name: 'Departments', icon: Building2, path: '/admin/departments' },
+    { name: 'AI Face Attendance', icon: Camera, path: '/face/attendance' },
+    { name: 'Register Student Face', icon: ScanFace, path: '/face/register' },
     { name: 'Risk Predictions', icon: Activity, path: '/admin/predictions' },
     { name: 'Reports', icon: BarChart3, path: '/admin/reports' },
     { name: 'Counseling Requests', icon: MessageSquare, path: '/admin/counseling' },
     { name: 'Interventions', icon: HandHeart, path: '/admin/interventions' },
-    { name: 'Departments', icon: Building2, path: '/admin/departments' },
     { name: 'Bulk Notifications', icon: Bell, path: '/admin/notifications' },
     { name: 'User Accounts', icon: UserCog, path: '/admin/users' },
     { name: 'System Settings', icon: Settings, path: '/admin/settings' },
-    { name: 'AI Face Attendance', icon: Camera, path: '/face/attendance' },
-    { name: 'Register Student Face', icon: ScanFace, path: '/face/register' },
   ];
 
   const teacherMenuItems = [
