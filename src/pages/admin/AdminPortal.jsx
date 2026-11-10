@@ -290,11 +290,19 @@ function UsersPanel({ data, reload, submit }) {
     setMsg('');
     try {
       await api.post(`/admin/api/courses/${courseId}/assign-teacher`, { teacher_id: teacherId });
-      setAssignedCourses(prev => prev.map(c => c._id === courseId ? { ...c, _assigned: true } : c));
-      // Refresh assigned courses
       const { data: res } = await api.get(`/admin/users/${assignTeacher.id}/detail`);
       setAssignedCourses(res.assigned_courses || []);
       setMsg('Teacher assigned to course.');
+    } catch (err) { setMsg(err.response?.data?.message || 'Failed.'); }
+  };
+
+  const removeCourseTeacher = async (courseId) => {
+    setMsg('');
+    try {
+      await api.post(`/admin/api/courses/${courseId}/assign-teacher`, { teacher_id: '' });
+      const { data: res } = await api.get(`/admin/users/${assignTeacher.id}/detail`);
+      setAssignedCourses(res.assigned_courses || []);
+      setMsg('Teacher removed from course.');
     } catch (err) { setMsg(err.response?.data?.message || 'Failed.'); }
   };
 
@@ -426,8 +434,12 @@ function UsersPanel({ data, reload, submit }) {
                   <p className="text-xs text-secondary uppercase mb-2">Currently assigned courses ({assignedCourses.length})</p>
                   <div className="flex flex-wrap gap-2">
                     {assignedCourses.map(c => (
-                      <span key={c._id} className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded">
+                      <span key={c._id} className="inline-flex items-center gap-1.5 text-xs bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded">
                         {c.subject} · {c.class_name}
+                        <button onClick={() => removeCourseTeacher(c._id)}
+                          className="text-red-400 hover:text-red-300 leading-none" title="Remove from course">
+                          ✕
+                        </button>
                       </span>
                     ))}
                   </div>
