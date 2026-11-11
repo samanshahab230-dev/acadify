@@ -1,5 +1,8 @@
 import AttendanceTab from './tabs/AttendanceTab';
 import MarksTab from './tabs/MarksTab';
+import TimetableTab from './tabs/TimetableTab';
+import ExamsTab from './tabs/ExamsTab';
+import AssignmentsTab from './tabs/AssignmentsTab';
 import VerifyTab from './tabs/VerifyTab';
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
@@ -47,6 +50,45 @@ export function TeacherMarksPage() {
       <Toast toast={toast} onClose={close} />
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-6">
         <MarksTab onMessage={show} />
+      </div>
+    </div>
+  );
+}
+
+export function TeacherTimetablePage() {
+  const { toast, show, close } = useToast();
+  return (
+    <div className="max-w-5xl mx-auto space-y-2">
+      <h1 className="text-2xl font-bold tracking-tight text-gray-900 mb-4">Timetable</h1>
+      <Toast toast={toast} onClose={close} />
+      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-6">
+        <TimetableTab onMessage={show} />
+      </div>
+    </div>
+  );
+}
+
+export function TeacherExamsPage() {
+  const { toast, show, close } = useToast();
+  return (
+    <div className="max-w-5xl mx-auto space-y-2">
+      <h1 className="text-2xl font-bold tracking-tight text-gray-900 mb-4">Exams</h1>
+      <Toast toast={toast} onClose={close} />
+      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-6">
+        <ExamsTab onMessage={show} />
+      </div>
+    </div>
+  );
+}
+
+export function TeacherAssignmentsPage() {
+  const { toast, show, close } = useToast();
+  return (
+    <div className="max-w-5xl mx-auto space-y-2">
+      <h1 className="text-2xl font-bold tracking-tight text-gray-900 mb-4">Assignments</h1>
+      <Toast toast={toast} onClose={close} />
+      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-6">
+        <AssignmentsTab onMessage={show} />
       </div>
     </div>
   );

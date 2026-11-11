@@ -290,74 +290,78 @@ def mark_attendance():
     return jsonify({'success': ok, 'message': message}), (200 if ok else 409)
 
 
-@teacher_bp.route('/assignments', methods=['POST'])
+@teacher_bp.route('/class-assignments', methods=['GET', 'POST'])
 @login_required
 @role_required('teacher')
-def create_assignment():
-    student = _assigned_student(request.form.get('student_id', '') or (request.get_json(silent=True) or {}).get('student_id', ''))
-    if not student:
-        return jsonify({'success': False, 'message': 'Student is not assigned to this teacher.'}), 403
-
+def class_assignments():
+    """GET: all assignments by this teacher. POST: publish class-level assignment."""
+    db = get_db()
+    try:
+        uid = ObjectId(current_user.id)
+    except Exception:
+        uid = current_user._id
+    if request.method == 'GET':
+        assignments = list(db.class_assignments.find({'teacher_id': uid}).sort('due_date', 1))
+        return jsonify({'assignments': [{
+            '_id': str(a['_id']), 'title': a.get('title', ''), 'subject': a.get('subject', ''),
+            'class_name': a.get('class_name', ''), 'department': a.get('department', ''),
+            'due_date': str(a.get('due_date', ''))[:10], 'priority': a.get('priority', 'medium'),
+            'description': a.get('description', ''), 'file_name': a.get('file_name', '')
+        } for a in assignments]})
     data = request.form
     title = (data.get('title') or '').strip()
     subject = (data.get('subject') or '').strip()
-    due_date = data.get('due_date', '')
-    if not title or subject not in {item['subject'] for item in student['subjects']} or not due_date:
-        return jsonify({'success': False, 'message': 'Enter a title, assigned subject, and due date.'}), 400
-
+    due_date = (data.get('due_date') or '').strip()
+    if not title or not subject or not due_date:
+        return jsonify({'success': False, 'message': 'Title, subject, and due date required.'}), 400
     file_path, file_name = None, None
     f = request.files.get('file')
     if f and f.filename:
         file_path, file_name = _save_file(f)
         if not file_path:
             return jsonify({'success': False, 'message': 'Invalid file type.'}), 400
-
-    AssignmentModel.create(
-        student['_id'], title, subject, due_date,
-        data.get('priority', 'medium'), (data.get('description') or '').strip(),
-        teacher_id=str(current_user._id), file_path=file_path, file_name=file_name
-    )
-    return jsonify({'success': True, 'message': 'Assignment created.'}), 201
-
-
-@teacher_bp.route('/assignments/file/<path:fname>')
-@login_required
-def download_assignment_file(fname):
-    return send_from_directory(UPLOAD_FOLDER, fname, as_attachment=True)
-
-
-@teacher_bp.route('/assignments/<student_id>')
-@login_required
-@role_required('teacher')
-def get_student_assignments(student_id):
-    student = _assigned_student(student_id)
-    if not student:
-        return jsonify({'success': False, 'message': 'Student not assigned.'}), 403
-    assignments = AssignmentModel.get_by_student(student['_id'])
-    return jsonify({'success': True, 'assignments': [{
-        '_id': str(a['_id']), 'title': a.get('title', ''), 'subject': a.get('subject', ''),
-        'due_date': str(a.get('due_date', ''))[:10], 'status': a.get('status', 'pending'),
-        'priority': a.get('priority', 'medium'), 'description': a.get('description', ''),
-        'submitted_at': str(a.get('submitted_at', '') or '')[:10],
-        'submission_note': a.get('submission_note', '')
-    } for a in assignments]})
+    db.class_assignments.insert_one({
+        'teacher_id': uid,
+        'course_id': ObjectId(data['course_id']) if data.get('course_id') else None,
+        'subject': subject, 'title': title,
+        'department': (data.get('department') or '').strip(),
+        'class_name': (data.get('class_name') or '').strip(),
+        'due_date': due_date, 'priority': data.get('priority', 'medium'),
+        'description': (data.get('description') or '').strip(),
+        'file_path': file_path, 'file_name': file_name,
+        'created_at': datetime.datetime.now(datetime.timezone.utc)
+    })
+    return jsonify({'success': True, 'message': 'Assignment published.'}), 201
 
 
-@teacher_bp.route('/timetable', methods=['POST'])
+@teacher_bp.route('/timetable', methods=['GET', 'POST'])
 @login_required
 @role_required('teacher')
-def add_timetable_slot():
+def teacher_timetable():
+    """GET: teacher's own timetable. POST: add a slot."""
+    db = get_db()
+    try:
+        uid = ObjectId(current_user.id)
+    except Exception:
+        uid = current_user._id
+    if request.method == 'GET':
+        slots = list(db.teacher_timetable.find({'teacher_id': uid}))
+        return jsonify({'slots': [{
+            '_id': str(s['_id']), 'day': s.get('day', ''), 'time': s.get('time', ''),
+            'subject': s.get('subject', ''), 'class_name': s.get('class_name', ''), 'room': s.get('room', '')
+        } for s in slots]})
     data = request.get_json(silent=True) or request.form
-    student = _assigned_student(data.get('student_id', ''))
-    if not student:
-        return jsonify({'success': False, 'message': 'Student not assigned.'}), 403
-    day = data.get('day', '').strip()
-    time = data.get('time', '').strip()
+    day = (data.get('day') or '').strip()
+    time = (data.get('time') or '').strip()
     subject = (data.get('subject') or '').strip()
-    room = (data.get('room') or '').strip()
     if not day or not time or not subject:
         return jsonify({'success': False, 'message': 'Day, time, and subject required.'}), 400
-    TimetableModel.add_slot(student['_id'], day, time, subject, room, teacher_id=str(current_user._id))
+    db.teacher_timetable.insert_one({
+        'teacher_id': uid, 'day': day, 'time': time, 'subject': subject,
+        'class_name': (data.get('class_name') or '').strip(),
+        'room': (data.get('room') or '').strip(),
+        'created_at': datetime.datetime.now(datetime.timezone.utc)
+    })
     return jsonify({'success': True, 'message': 'Slot added.'})
 
 
@@ -365,54 +369,62 @@ def add_timetable_slot():
 @login_required
 @role_required('teacher')
 def delete_timetable_slot(slot_id):
-    TimetableModel.delete_slot(slot_id)
+    db = get_db()
+    try:
+        db.teacher_timetable.delete_one({'_id': ObjectId(slot_id)})
+    except Exception:
+        pass
     return jsonify({'success': True})
 
 
-@teacher_bp.route('/exams', methods=['POST'])
+@teacher_bp.route('/class-exams', methods=['GET', 'POST'])
 @login_required
 @role_required('teacher')
-def create_exam():
+def class_exams():
+    """GET: all exams by this teacher. POST: schedule a class-level exam."""
+    db = get_db()
+    try:
+        uid = ObjectId(current_user.id)
+    except Exception:
+        uid = current_user._id
+    if request.method == 'GET':
+        exams = list(db.class_exams.find({'teacher_id': uid}).sort('exam_date', 1))
+        return jsonify({'exams': [{
+            '_id': str(e['_id']), 'subject': e.get('subject', ''),
+            'class_name': e.get('class_name', ''), 'department': e.get('department', ''),
+            'exam_type': e.get('exam_type', ''), 'exam_date': e.get('exam_date', ''),
+            'venue': e.get('venue', ''), 'notes': e.get('notes', '')
+        } for e in exams]})
     data = request.get_json(silent=True) or request.form
-    student = _assigned_student(data.get('student_id', ''))
-    if not student:
-        return jsonify({'success': False, 'message': 'Student not assigned.'}), 403
     subject = (data.get('subject') or '').strip()
     exam_date = (data.get('exam_date') or '').strip()
     if not subject or not exam_date:
         return jsonify({'success': False, 'message': 'Subject and date required.'}), 400
-    ExamModel.create(
-        student['_id'], subject,
-        data.get('exam_type', 'mid'),
-        exam_date,
-        (data.get('venue') or '').strip(),
-        (data.get('notes') or '').strip(),
-        teacher_id=str(current_user._id)
-    )
-    return jsonify({'success': True, 'message': 'Exam added.'}), 201
+    db.class_exams.insert_one({
+        'teacher_id': uid,
+        'course_id': ObjectId(data['course_id']) if data.get('course_id') else None,
+        'subject': subject,
+        'department': (data.get('department') or '').strip(),
+        'class_name': (data.get('class_name') or '').strip(),
+        'exam_type': data.get('exam_type', 'mid'),
+        'exam_date': exam_date,
+        'venue': (data.get('venue') or '').strip(),
+        'notes': (data.get('notes') or '').strip(),
+        'created_at': datetime.datetime.now(datetime.timezone.utc)
+    })
+    return jsonify({'success': True, 'message': 'Exam scheduled.'}), 201
 
 
-@teacher_bp.route('/exams/<exam_id>/delete', methods=['POST'])
+@teacher_bp.route('/class-exams/<exam_id>/delete', methods=['POST'])
 @login_required
 @role_required('teacher')
-def delete_exam(exam_id):
-    ExamModel.delete(exam_id)
+def delete_class_exam(exam_id):
+    db = get_db()
+    try:
+        db.class_exams.delete_one({'_id': ObjectId(exam_id)})
+    except Exception:
+        pass
     return jsonify({'success': True})
-
-
-@teacher_bp.route('/exams/<student_id>')
-@login_required
-@role_required('teacher')
-def get_student_exams(student_id):
-    student = _assigned_student(student_id)
-    if not student:
-        return jsonify({'success': False, 'message': 'Student not assigned.'}), 403
-    exams = ExamModel.get_by_student(student['_id'])
-    return jsonify({'success': True, 'exams': [{
-        '_id': str(e['_id']), 'subject': e.get('subject', ''),
-        'exam_type': e.get('exam_type', ''), 'exam_date': e.get('exam_date', ''),
-        'venue': e.get('venue', ''), 'notes': e.get('notes', '')
-    } for e in exams]})
 
 
 @teacher_bp.route('/marks', methods=['POST'])
