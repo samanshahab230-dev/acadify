@@ -51,6 +51,34 @@ export default function AttendanceTab({ onMessage }) {
       }).catch(() => {});
   }, [cls]);
 
+  // Load saved statuses for the selected course and date.
+  useEffect(() => {
+    if (!courseId || !date || !students.length) {
+      setSubmitted(false);
+      setEditMode(false);
+      return;
+    }
+    let active = true;
+    const initial = Object.fromEntries(students.map(student => [student._id, 'present']));
+    setAttendance(initial);
+    setSubmitted(false);
+    setEditMode(false);
+    api.get(`/teacher/course-attendance?course_id=${encodeURIComponent(courseId)}&date=${encodeURIComponent(date)}`, { noCache: true })
+      .then(({ data }) => {
+        if (!active) return;
+        const saved = Object.fromEntries((data.records || []).map(record => [record.student_id, record.status]));
+        const current = { ...initial, ...saved };
+        setAttendance(current);
+        setSavedRecords(current);
+        setSubmitted(Object.keys(saved).length > 0);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSavedRecords({});
+      });
+    return () => { active = false; };
+  }, [courseId, date, students]);
+
   const toggle = (sid) => setAttendance(a => ({ ...a, [sid]: a[sid] === 'present' ? 'absent' : 'present' }));
   const markAll = (status) => setAttendance(a => Object.fromEntries(Object.keys(a).map(k => [k, status])));
 

@@ -255,6 +255,34 @@ def edit_course_attendance():
     return jsonify({'success': True, 'message': 'Attendance updated.'})
 
 
+@teacher_bp.route('/course-attendance', methods=['GET'])
+@login_required
+@role_required('teacher')
+def get_course_attendance():
+    db = get_db()
+    course_id = request.args.get('course_id', '').strip()
+    date_str = request.args.get('date', '').strip()
+    try:
+        cid = ObjectId(course_id)
+        date_dt = datetime.datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc)
+    except Exception:
+        return jsonify({'success': False, 'message': 'Valid course_id and date required.'}), 400
+    try:
+        uid = ObjectId(current_user.id)
+    except Exception:
+        uid = current_user._id
+    course = db.courses.find_one({'_id': cid, 'teacher_id': {'$in': [uid, str(uid)]}})
+    if not course:
+        return jsonify({'success': False, 'message': 'Course is not assigned to this teacher.'}), 403
+    records = list(db.course_attendance.find(
+        {'course_id': cid, 'date': date_dt}, {'student_id': 1, 'status': 1}
+    ))
+    return jsonify({'success': True, 'records': [
+        {'student_id': str(record['student_id']), 'status': record.get('status', 'present')}
+        for record in records
+    ]})
+
+
 @teacher_bp.route('/course-attendance', methods=['POST'])
 @login_required
 @role_required('teacher')
