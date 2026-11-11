@@ -63,9 +63,18 @@ def dashboard():
     result = []
     for student in students:
         user = db.users.find_one({'_id': student.get('user_id')})
-        subjects = AttendanceModel.get_subjects(student['_id'])
-        assignments = AssignmentModel.get_by_student(student['_id'])[:5]
-        attendance_records = AttendanceModel.get_records(student['_id'], limit=5)
+        # course-wise attendance
+        enrollments = list(db.course_enrollments.find({'student_id': student['_id']}))
+        courses_att = []
+        for enr in enrollments:
+            course = db.courses.find_one({'_id': enr['course_id']})
+            if not course:
+                continue
+            att_records = list(db.course_attendance.find({'course_id': enr['course_id'], 'student_id': student['_id']}))
+            total = len(att_records)
+            present = sum(1 for r in att_records if r.get('status') == 'present')
+            pct = round(present / total * 100, 1) if total else 0
+            courses_att.append({'course_id': str(enr['course_id']), 'subject': course.get('subject', ''), 'present': present, 'total': total, 'percentage': pct})
         result.append({
             '_id': str(student['_id']),
             'name': user.get('name', 'Student') if user else 'Student',
@@ -74,12 +83,192 @@ def dashboard():
             'class_name': student.get('class_name', ''),
             'attendance_pct': round(float(student.get('attendance_pct', 0)), 2),
             'risk_level': student.get('risk_level', 'LOW'),
-            'subjects': [{'subject': s['subject'], 'attended': s.get('attended', 0), 'total_classes': s.get('total_classes', 0)} for s in subjects],
-            'assignments': [{'_id': str(a['_id']), 'title': a.get('title', ''), 'subject': a.get('subject', ''), 'due_date': str(a.get('due_date', ''))} for a in assignments],
-            'attendance_records': [{'subject': r.get('subject', ''), 'status': r.get('status', ''), 'date': str(r.get('date', r.get('created_at', '')))[:10]} for r in attendance_records],
+            'courses_attendance': courses_att,
         })
     result.sort(key=lambda x: x['name'])
     return jsonify({'success': True, 'students': result})
+
+
+@teacher_bp.route('/my-departments')
+@login_required
+@role_required('teacher')
+def my_departments():
+    """Return distinct departments of classes assigned to this teacher."""
+    db = get_db()
+    try:
+        uid = ObjectId(current_user.id)
+    except Exception:
+        uid = current_user._id
+    students = list(db.students.find({'teacher_ids': uid}, {'department': 1}))
+    depts = sorted({s.get('department', '') for s in students if s.get('department')})
+    return jsonify({'departments': depts})
+
+
+@teacher_bp.route('/my-classes')
+@login_required
+@role_required('teacher')
+def my_classes():
+    """Return distinct class names for a given department assigned to this teacher."""
+    db = get_db()
+    dept = request.args.get('department', '').strip()
+    try:
+        uid = ObjectId(current_user.id)
+    except Exception:
+        uid = current_user._id
+    query = {'teacher_ids': uid}
+    if dept:
+        query['department'] = dept
+    students = list(db.students.find(query, {'class_name': 1}))
+    classes = sorted({s.get('class_name', '') for s in students if s.get('class_name')})
+    return jsonify({'classes': classes})
+
+
+@teacher_bp.route('/class-students')
+@login_required
+@role_required('teacher')
+def class_students():
+    """Return students + their enrolled courses for a dept+class assigned to this teacher."""
+    db = get_db()
+    dept = request.args.get('department', '').strip()
+    class_name = request.args.get('class_name', '').strip()
+    try:
+        uid = ObjectId(current_user.id)
+    except Exception:
+        uid = current_user._id
+    query = {'teacher_ids': uid}
+    if dept:
+        query['department'] = dept
+    if class_name:
+        query['class_name'] = class_name
+    students = list(db.students.find(query))
+    result = []
+    for s in students:
+        user = db.users.find_one({'_id': s.get('user_id')})
+        enrollments = list(db.course_enrollments.find({'student_id': s['_id']}))
+        courses = []
+        for enr in enrollments:
+            course = db.courses.find_one({'_id': enr['course_id']})
+            if course:
+                courses.append({'course_id': str(enr['course_id']), 'subject': course.get('subject', '')})
+        result.append({
+            '_id': str(s['_id']),
+            'name': user.get('name', '') if user else '',
+            'roll_no': s.get('roll_no', ''),
+            'courses': courses,
+        })
+    result.sort(key=lambda x: x['name'])
+    return jsonify({'students': result})
+
+
+@teacher_bp.route('/course-attendance', methods=['POST'])
+@login_required
+@role_required('teacher')
+def mark_course_attendance():
+    """Mark attendance for multiple students in a course on a date."""
+    db = get_db()
+    data = request.get_json(silent=True) or {}
+    course_id = (data.get('course_id') or '').strip()
+    date_str = (data.get('date') or datetime.date.today().isoformat()).strip()
+    records = data.get('records', [])  # [{student_id, status}]
+    if not course_id or not records:
+        return jsonify({'success': False, 'message': 'course_id and records required.'}), 400
+    try:
+        cid = ObjectId(course_id)
+    except Exception:
+        return jsonify({'success': False, 'message': 'Invalid course ID.'}), 400
+    course = db.courses.find_one({'_id': cid})
+    if not course:
+        return jsonify({'success': False, 'message': 'Course not found.'}), 404
+    date_dt = datetime.datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc)
+    saved = 0
+    for rec in records:
+        try:
+            sid = ObjectId(rec['student_id'])
+        except Exception:
+            continue
+        status = rec.get('status', 'present')
+        if status not in ('present', 'absent'):
+            continue
+        db.course_attendance.update_one(
+            {'course_id': cid, 'student_id': sid, 'date': date_dt},
+            {'$set': {'status': status, 'marked_by': str(current_user.id), 'updated_at': datetime.datetime.now(datetime.timezone.utc)}},
+            upsert=True
+        )
+        saved += 1
+    # Recalculate overall attendance_pct for each student
+    student_ids = []
+    for rec in records:
+        try:
+            student_ids.append(ObjectId(rec['student_id']))
+        except Exception:
+            pass
+    for sid in student_ids:
+        all_enrollments = list(db.course_enrollments.find({'student_id': sid}))
+        total_all = present_all = 0
+        for enr in all_enrollments:
+            recs = list(db.course_attendance.find({'course_id': enr['course_id'], 'student_id': sid}))
+            total_all += len(recs)
+            present_all += sum(1 for r in recs if r.get('status') == 'present')
+        pct = round(present_all / total_all * 100, 2) if total_all else 0
+        db.students.update_one({'_id': sid}, {'$set': {'attendance_pct': pct}})
+    return jsonify({'success': True, 'message': f'{saved} records saved.'})
+
+
+@teacher_bp.route('/course-marks', methods=['POST'])
+@login_required
+@role_required('teacher')
+def save_course_marks():
+    """Save mid/final/obtained/total marks for a student in a course."""
+    db = get_db()
+    data = request.get_json(silent=True) or {}
+    course_id = (data.get('course_id') or '').strip()
+    student_id = (data.get('student_id') or '').strip()
+    if not course_id or not student_id:
+        return jsonify({'success': False, 'message': 'course_id and student_id required.'}), 400
+    try:
+        cid = ObjectId(course_id)
+        sid = ObjectId(student_id)
+    except Exception:
+        return jsonify({'success': False, 'message': 'Invalid IDs.'}), 400
+    mid = float(data.get('mid_marks', 0) or 0)
+    final = float(data.get('final_marks', 0) or 0)
+    total = float(data.get('total_marks', 100) or 100)
+    obtained = float(data.get('obtained_marks', 0) or 0)
+    db.course_marks.update_one(
+        {'course_id': cid, 'student_id': sid},
+        {'$set': {'mid_marks': mid, 'final_marks': final, 'total_marks': total,
+                  'obtained_marks': obtained, 'updated_at': datetime.datetime.now(datetime.timezone.utc),
+                  'teacher_id': ObjectId(current_user.id) if current_user.id else None}},
+        upsert=True
+    )
+    return jsonify({'success': True, 'message': 'Marks saved.'})
+
+
+@teacher_bp.route('/course-marks/<course_id>')
+@login_required
+@role_required('teacher')
+def get_course_marks(course_id):
+    """Get all students' marks for a course."""
+    db = get_db()
+    try:
+        cid = ObjectId(course_id)
+    except Exception:
+        return jsonify({'success': False}), 400
+    marks = list(db.course_marks.find({'course_id': cid}))
+    result = []
+    for m in marks:
+        student = db.students.find_one({'_id': m['student_id']})
+        user = db.users.find_one({'_id': student['user_id']}) if student else None
+        result.append({
+            'student_id': str(m['student_id']),
+            'name': user.get('name', '') if user else '',
+            'roll_no': student.get('roll_no', '') if student else '',
+            'mid_marks': m.get('mid_marks', 0),
+            'final_marks': m.get('final_marks', 0),
+            'total_marks': m.get('total_marks', 100),
+            'obtained_marks': m.get('obtained_marks', 0),
+        })
+    return jsonify({'marks': result})
 
 
 @teacher_bp.route('/attendance', methods=['POST'])

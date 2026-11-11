@@ -1,19 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Users, AlertTriangle, RefreshCw, X, TrendingUp, BookOpen, Clock, Calendar, BarChart3, CalendarCheck, CheckCircle, ChevronDown } from 'lucide-react';
+import { Users, AlertTriangle, RefreshCw, X, TrendingUp, BookOpen, BarChart3, CalendarCheck, CheckCircle } from 'lucide-react';
 import api from '../../services/api';
 import AttendanceTab from './tabs/AttendanceTab';
 import MarksTab from './tabs/MarksTab';
-import TimetableTab from './tabs/TimetableTab';
-import ExamsTab from './tabs/ExamsTab';
-import AssignmentsTab from './tabs/AssignmentsTab';
 import VerifyTab from './tabs/VerifyTab';
 
 const TABS = [
   { id: 'attendance', label: 'Attendance', icon: CalendarCheck, color: 'text-cyan-400' },
   { id: 'marks', label: 'Marks', icon: BarChart3, color: 'text-purple-400' },
-  { id: 'timetable', label: 'Timetable', icon: Clock, color: 'text-blue-400' },
-  { id: 'exams', label: 'Exams', icon: Calendar, color: 'text-amber-400' },
-  { id: 'assignments', label: 'Assignments', icon: BookOpen, color: 'text-emerald-400' },
   { id: 'verify', label: 'Verify Exceptions', icon: CheckCircle, color: 'text-rose-400' },
 ];
 
@@ -235,12 +229,9 @@ export default function TeacherDashboard() {
 
               {/* Tab Content */}
               <div className="p-6">
-                {activeTab === 'attendance'  && <AttendanceTab  student={selectedStudent} onMessage={showToast} onReload={reload} />}
-                {activeTab === 'marks'       && <MarksTab       student={selectedStudent} onMessage={showToast} onReload={reload} />}
-                {activeTab === 'timetable'   && <TimetableTab   student={selectedStudent} onMessage={showToast} />}
-                {activeTab === 'exams'       && <ExamsTab       student={selectedStudent} onMessage={showToast} />}
-                {activeTab === 'assignments' && <AssignmentsTab student={selectedStudent} onMessage={showToast} onReload={reload} />}
-                {activeTab === 'verify'      && <VerifyTab      student={selectedStudent} onMessage={showToast} onReload={reload} />}
+                {activeTab === 'attendance' && <AttendanceTab onMessage={showToast} />}
+                {activeTab === 'marks'      && <MarksTab      onMessage={showToast} />}
+                {activeTab === 'verify'     && <VerifyTab     student={selectedStudent} onMessage={showToast} onReload={reload} />}
               </div>
             </div>
 

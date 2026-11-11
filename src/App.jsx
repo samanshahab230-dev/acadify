@@ -49,9 +49,6 @@ const StudentNotes    = lazyNamed(() => import('./pages/student/PortalFeatures')
 
 const TeacherAttendancePage  = lazyNamed(() => import('./pages/teacher/TeacherPages'), 'TeacherAttendancePage');
 const TeacherMarksPage       = lazyNamed(() => import('./pages/teacher/TeacherPages'), 'TeacherMarksPage');
-const TeacherTimetablePage   = lazyNamed(() => import('./pages/teacher/TeacherPages'), 'TeacherTimetablePage');
-const TeacherExamsPage       = lazyNamed(() => import('./pages/teacher/TeacherPages'), 'TeacherExamsPage');
-const TeacherAssignmentsPage = lazyNamed(() => import('./pages/teacher/TeacherPages'), 'TeacherAssignmentsPage');
 const TeacherVerifyPage      = lazyNamed(() => import('./pages/teacher/TeacherPages'), 'TeacherVerifyPage');
 
 function App() {
@@ -84,9 +81,6 @@ function App() {
             <Route path="/teacher/dashboard"   element={<TeacherDashboard />} />
             <Route path="/teacher/attendance"  element={<TeacherAttendancePage />} />
             <Route path="/teacher/marks"       element={<TeacherMarksPage />} />
-            <Route path="/teacher/timetable"   element={<TeacherTimetablePage />} />
-            <Route path="/teacher/exams"       element={<TeacherExamsPage />} />
-            <Route path="/teacher/assignments" element={<TeacherAssignmentsPage />} />
             <Route path="/teacher/verify"      element={<TeacherVerifyPage />} />
 
             {/* Parent */}

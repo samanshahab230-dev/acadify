@@ -83,12 +83,8 @@ export default function AppLayout() {
     { name: 'Dashboard', icon: LayoutDashboard, path: '/teacher/dashboard' },
     { name: 'Attendance', icon: CheckSquare, path: '/teacher/attendance' },
     { name: 'Marks', icon: BarChart3, path: '/teacher/marks' },
-    { name: 'Timetable', icon: Clock, path: '/teacher/timetable' },
-    { name: 'Exams', icon: Calendar, path: '/teacher/exams' },
-    { name: 'Assignments', icon: FileText, path: '/teacher/assignments' },
     { name: 'Verify Exceptions', icon: CheckSquare, path: '/teacher/verify' },
     { name: 'AI Face Attendance', icon: Camera, path: '/face/attendance' },
-    { name: 'Face History', icon: Camera, path: '/face/history' },
   ];
 
   const parentMenuItems = [
