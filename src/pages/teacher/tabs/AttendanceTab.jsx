@@ -14,6 +14,8 @@ export default function AttendanceTab({ onMessage }) {
   const [attendance, setAttendance] = useState({}); // {student_id: 'present'|'absent'}
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [savedRecords, setSavedRecords] = useState({});
 
   // Load departments
   useEffect(() => {
@@ -44,6 +46,8 @@ export default function AttendanceTab({ onMessage }) {
         const init = {};
         list.forEach(s => { init[s._id] = 'present'; });
         setAttendance(init);
+        setEditMode(false);
+        setSavedRecords({});
       }).catch(() => {});
   }, [cls]);
 
@@ -58,7 +62,9 @@ export default function AttendanceTab({ onMessage }) {
       const records = students.map(s => ({ student_id: s._id, status: attendance[s._id] || 'present' }));
       const { data } = await api.post('/teacher/course-attendance', { course_id: courseId, date, records });
       onMessage(data.message || 'Attendance saved.');
+      setSavedRecords({ ...attendance });
       setSubmitted(true);
+      setEditMode(false);
       setTimeout(() => setSubmitted(false), 3000);
     } catch (err) {
       onMessage(err.response?.data?.message || 'Failed to save.', 'error');
@@ -144,11 +150,19 @@ export default function AttendanceTab({ onMessage }) {
 
           <button
             onClick={handleSubmit}
-            disabled={saving || submitted}
+            disabled={saving || (submitted && !editMode)}
             className="px-6 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-40 transition-all"
           >
-            {saving ? 'Saving...' : submitted ? '✓ Saved' : 'Save Attendance'}
+            {saving ? 'Saving...' : submitted && !editMode ? '✓ Saved' : 'Save Attendance'}
           </button>
+          {submitted && !editMode && (
+            <button
+              onClick={() => setEditMode(true)}
+              className="px-6 py-2.5 rounded-xl border border-blue-300 bg-blue-50 text-blue-700 text-sm font-semibold hover:bg-blue-100 transition-all"
+            >
+              Edit Attendance
+            </button>
+          )}
         </div>
       )}
 

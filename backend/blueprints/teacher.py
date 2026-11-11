@@ -219,6 +219,42 @@ def class_students():
     return jsonify({'students': result})
 
 
+@teacher_bp.route('/course-attendance/edit', methods=['POST'])
+@login_required
+@role_required('teacher')
+def edit_course_attendance():
+    """Edit a single student's attendance status for a course+date."""
+    db = get_db()
+    data = request.get_json(silent=True) or {}
+    course_id = (data.get('course_id') or '').strip()
+    student_id = (data.get('student_id') or '').strip()
+    date_str = (data.get('date') or '').strip()
+    status = data.get('status', 'present')
+    if not course_id or not student_id or not date_str or status not in ('present', 'absent'):
+        return jsonify({'success': False, 'message': 'course_id, student_id, date, status required.'}), 400
+    try:
+        cid = ObjectId(course_id)
+        sid = ObjectId(student_id)
+        date_dt = datetime.datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc)
+    except Exception:
+        return jsonify({'success': False, 'message': 'Invalid data.'}), 400
+    db.course_attendance.update_one(
+        {'course_id': cid, 'student_id': sid, 'date': date_dt},
+        {'$set': {'status': status, 'marked_by': str(current_user.id), 'updated_at': datetime.datetime.now(datetime.timezone.utc)}},
+        upsert=True
+    )
+    # Recalculate attendance_pct
+    all_enrollments = list(db.course_enrollments.find({'student_id': sid}))
+    total_all = present_all = 0
+    for enr in all_enrollments:
+        recs = list(db.course_attendance.find({'course_id': enr['course_id'], 'student_id': sid}))
+        total_all += len(recs)
+        present_all += sum(1 for r in recs if r.get('status') == 'present')
+    pct = round(present_all / total_all * 100, 2) if total_all else 0
+    db.students.update_one({'_id': sid}, {'$set': {'attendance_pct': pct}})
+    return jsonify({'success': True, 'message': 'Attendance updated.'})
+
+
 @teacher_bp.route('/course-attendance', methods=['POST'])
 @login_required
 @role_required('teacher')

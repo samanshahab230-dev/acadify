@@ -33,7 +33,11 @@ export default function FaceAttendance() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    api.get('/admin/api/departments').then(r => setAllDepts(r.data.departments || [])).catch(() => {});
+    // Use teacher's assigned departments if teacher, else admin all-departments
+    const deptUrl = '/teacher/my-departments';
+    api.get(deptUrl).then(r => setAllDepts(r.data.departments || [])).catch(() =>
+      api.get('/admin/api/departments').then(r => setAllDepts(r.data.departments || [])).catch(() => {})
+    );
     api.get('/api/face/status').then(() => setModelReady(true)).catch(() => setMessage('Face recognition models unavailable.'));
     loadTodaySessions();
     return () => {

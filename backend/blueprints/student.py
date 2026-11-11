@@ -190,15 +190,32 @@ def attendance():
     student = _get_student_or_abort()
     if not student:
         return jsonify({'error': 'Student not found'}), 404
-    subjects = AttendanceModel.get_subjects(student['_id'])
-    records = AttendanceModel.get_records(student['_id'], limit=60)
-    streak = AttendanceModel.get_streak(student['_id'])
-    student = StudentModel.get_by_user_id(current_user.id)
+    from models.db import get_db
+    db = get_db()
+    enrollments = list(db.course_enrollments.find({'student_id': student['_id']}))
+    subjects = []
+    records = []
+    for enr in enrollments:
+        course = db.courses.find_one({'_id': enr['course_id']})
+        if not course:
+            continue
+        att_recs = list(db.course_attendance.find({'course_id': enr['course_id'], 'student_id': student['_id']}).sort('date', -1))
+        total = len(att_recs)
+        present = sum(1 for r in att_recs if r.get('status') == 'present')
+        pct = round(present / total * 100, 1) if total else 0
+        subjects.append({'subject': course.get('subject', ''), 'attended': present, 'total_classes': total, 'percentage': pct})
+        for r in att_recs[:20]:
+            records.append({'subject': course.get('subject', ''), 'status': r.get('status', ''), 'date': str(r.get('date', ''))[:10], 'marked_by': r.get('marked_by', '')})
+    face_recs = list(db.face_attendance.find({'student_id': student['_id']}).sort('marked_at', -1).limit(20))
+    for r in face_recs:
+        records.append({'subject': r.get('subject', 'Face Attendance'), 'status': r.get('status', 'present'), 'date': r.get('date', ''), 'marked_by': 'AI Face'})
+    records.sort(key=lambda x: x.get('date', ''), reverse=True)
+    student_fresh = StudentModel.get_by_user_id(current_user.id)
     return jsonify({
-        'student': {'attendance_pct': round(float(student.get('attendance_pct', 0)), 2)},
-        'subjects': [{'subject': s['subject'], 'attended': s.get('attended', 0), 'total_classes': s.get('total_classes', 0)} for s in subjects],
-        'records': [{'subject': r.get('subject', ''), 'status': r.get('status', ''), 'date': str(r.get('date', r.get('created_at', '')))[:10]} for r in records],
-        'streak': streak,
+        'student': {'attendance_pct': round(float(student_fresh.get('attendance_pct', 0)), 2)},
+        'subjects': subjects,
+        'records': records[:60],
+        'streak': 0,
     })
 
 
