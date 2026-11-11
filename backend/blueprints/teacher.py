@@ -93,15 +93,26 @@ def dashboard():
 @login_required
 @role_required('teacher')
 def my_departments():
-    """Return distinct departments of classes assigned to this teacher."""
+    """Return distinct departments assigned to this teacher via students OR courses."""
     db = get_db()
     try:
         uid = ObjectId(current_user.id)
     except Exception:
         uid = current_user._id
+    # From students directly assigned
     students = list(db.students.find({'teacher_ids': uid}, {'department': 1}))
-    depts = sorted({s.get('department', '') for s in students if s.get('department')})
-    return jsonify({'departments': depts})
+    depts = {s.get('department', '') for s in students if s.get('department')}
+    # From courses assigned to this teacher
+    courses = list(db.courses.find({'teacher_id': uid}, {'department': 1}))
+    for c in courses:
+        if c.get('department'):
+            depts.add(c['department'])
+    # Also from courses where teacher_id is string
+    courses_str = list(db.courses.find({'teacher_id': str(uid)}, {'department': 1}))
+    for c in courses_str:
+        if c.get('department'):
+            depts.add(c['department'])
+    return jsonify({'departments': sorted(depts)})
 
 
 @teacher_bp.route('/my-classes')
@@ -115,12 +126,24 @@ def my_classes():
         uid = ObjectId(current_user.id)
     except Exception:
         uid = current_user._id
+    classes = set()
+    # From students directly assigned
     query = {'teacher_ids': uid}
     if dept:
         query['department'] = dept
     students = list(db.students.find(query, {'class_name': 1}))
-    classes = sorted({s.get('class_name', '') for s in students if s.get('class_name')})
-    return jsonify({'classes': classes})
+    for s in students:
+        if s.get('class_name'):
+            classes.add(s['class_name'])
+    # From courses assigned to this teacher
+    course_query = {'teacher_id': {'$in': [uid, str(uid)]}}
+    if dept:
+        course_query['department'] = dept
+    courses = list(db.courses.find(course_query, {'class_name': 1}))
+    for c in courses:
+        if c.get('class_name'):
+            classes.add(c['class_name'])
+    return jsonify({'classes': sorted(classes)})
 
 
 @teacher_bp.route('/class-students')
@@ -135,14 +158,30 @@ def class_students():
         uid = ObjectId(current_user.id)
     except Exception:
         uid = current_user._id
-    query = {'teacher_ids': uid}
+
+    # Get student IDs from course enrollments for courses assigned to this teacher
+    course_query = {'teacher_id': {'$in': [uid, str(uid)]}}
     if dept:
-        query['department'] = dept
+        course_query['department'] = dept
     if class_name:
-        query['class_name'] = class_name
-    students = list(db.students.find(query))
+        course_query['class_name'] = class_name
+    teacher_courses = list(db.courses.find(course_query))
+    course_ids = [c['_id'] for c in teacher_courses]
+    enrolled_ids = set(db.course_enrollments.distinct('student_id', {'course_id': {'$in': course_ids}})) if course_ids else set()
+
+    # Also get students directly assigned via teacher_ids
+    direct_query = {'teacher_ids': uid}
+    if dept:
+        direct_query['department'] = dept
+    if class_name:
+        direct_query['class_name'] = class_name
+    direct_students = list(db.students.find(direct_query))
+    for s in direct_students:
+        enrolled_ids.add(s['_id'])
+
+    all_students = list(db.students.find({'_id': {'$in': list(enrolled_ids)}}))
     result = []
-    for s in students:
+    for s in all_students:
         user = db.users.find_one({'_id': s.get('user_id')})
         enrollments = list(db.course_enrollments.find({'student_id': s['_id']}))
         courses = []
