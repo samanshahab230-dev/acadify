@@ -211,14 +211,21 @@ def timetable():
     student = _get_student_or_abort()
     if not student:
         return jsonify({'error': 'Student not found'}), 404
-    grouped = TimetableModel.get_timetable(student['_id'])
-    serialized = {}
-    for day, slots in grouped.items():
-        serialized[day] = [{
-            '_id': str(s['_id']), 'subject': s.get('subject', ''),
-            'time': s.get('time', ''), 'room': s.get('room', '')
-        } for s in slots]
-    return jsonify({'timetable': serialized, 'days': DAYS})
+    from models.db import get_db
+    db = get_db()
+    query = {}
+    if student.get('class_name'):
+        query['class_name'] = student['class_name']
+    slots = list(db.teacher_timetable.find(query).sort('time', 1))
+    grouped = {day: [] for day in DAYS}
+    for s in slots:
+        day = s.get('day', '')
+        if day in grouped:
+            grouped[day].append({
+                '_id': str(s['_id']), 'subject': s.get('subject', ''),
+                'time': s.get('time', ''), 'room': s.get('room', '')
+            })
+    return jsonify({'timetable': grouped, 'days': DAYS})
 
 
 # ─── ASSIGNMENTS ───────────────────────────────────────────────────────────────
@@ -235,6 +242,9 @@ def assignments():
         action = request.form.get('action') or (request.get_json(silent=True) or {}).get('action')
         assignment_id = request.form.get('assignment_id') or (request.get_json(silent=True) or {}).get('assignment_id')
         if action == 'submit':
+            from models.db import get_db
+            from bson import ObjectId
+            db = get_db()
             note = (request.form.get('submission_note') or '').strip()
             sub_file_path, sub_file_name = None, None
             f = request.files.get('file')
@@ -245,24 +255,50 @@ def assignments():
                     fname = f"{uuid.uuid4().hex}.{ext}"
                     f.save(os.path.join(UPLOAD_FOLDER, fname))
                     sub_file_path, sub_file_name = fname, secure_filename(f.filename)
-            AssignmentModel.submit(assignment_id, note, sub_file_path, sub_file_name)
+            try:
+                aid = ObjectId(assignment_id)
+            except Exception:
+                return jsonify({'success': False, 'message': 'Invalid assignment ID.'}), 400
+            db.assignment_submissions.update_one(
+                {'assignment_id': aid, 'student_id': student['_id']},
+                {'$set': {
+                    'status': 'completed',
+                    'submitted_at': datetime.datetime.now(datetime.timezone.utc),
+                    'submission_note': note,
+                    'submission_file_path': sub_file_path,
+                    'submission_file_name': sub_file_name,
+                }},
+                upsert=True
+            )
             return jsonify({'success': True, 'message': 'Assignment submitted.'})
         return jsonify({'success': False, 'message': 'Unknown action.'}), 400
 
-    all_assignments = AssignmentModel.get_by_student(student['_id'])
+    from models.db import get_db
+    db = get_db()
+    # Fetch class-level assignments from teacher for this student's class
+    query = {}
+    if student.get('department'):
+        query['department'] = student['department']
+    if student.get('class_name'):
+        query['class_name'] = student['class_name']
+    all_assignments = list(db.class_assignments.find(query).sort('due_date', 1))
+    # Get submission status for each assignment
+    from bson import ObjectId
+    sid = student['_id']
     today = datetime.date.today().isoformat()
-    return jsonify({
-        'assignments': [{
+    result = []
+    for a in all_assignments:
+        sub = db.assignment_submissions.find_one({'assignment_id': a['_id'], 'student_id': sid})
+        result.append({
             '_id': str(a['_id']), 'title': a.get('title', ''), 'subject': a.get('subject', ''),
-            'due_date': str(a.get('due_date', ''))[:10], 'status': a.get('status', 'pending'),
+            'due_date': str(a.get('due_date', ''))[:10], 'status': sub['status'] if sub else 'pending',
             'priority': a.get('priority', 'medium'), 'description': a.get('description', ''),
             'file_name': a.get('file_name'), 'file_path': a.get('file_path'),
-            'submitted_at': str(a.get('submitted_at', '') or '')[:10],
-            'submission_note': a.get('submission_note', ''),
-            'submission_file_name': a.get('submission_file_name'),
-        } for a in all_assignments],
-        'today': today,
-    })
+            'submitted_at': str(sub.get('submitted_at', '') or '')[:10] if sub else '',
+            'submission_note': sub.get('submission_note', '') if sub else '',
+            'submission_file_name': sub.get('submission_file_name') if sub else None,
+        })
+    return jsonify({'assignments': result, 'today': today})
 
 
 @student_bp.route('/assignments/file/<path:fname>')
@@ -510,7 +546,15 @@ def exams():
     student = _get_student_or_abort()
     if not student:
         return jsonify({'error': 'Student not found'}), 404
-    all_exams = ExamModel.get_by_student(student['_id'])
+    from models.db import get_db
+    db = get_db()
+    # Fetch class-level exams scheduled by teacher for this student's class
+    query = {}
+    if student.get('department'):
+        query['department'] = student['department']
+    if student.get('class_name'):
+        query['class_name'] = student['class_name']
+    all_exams = list(db.class_exams.find(query).sort('exam_date', 1))
     today = datetime.date.today().isoformat()
     return jsonify({
         'exams': [{
