@@ -88,7 +88,7 @@ export default function AppLayout() {
     { name: 'Assignments', icon: FileText, path: '/teacher/assignments' },
     { name: 'Verify Exceptions', icon: CheckSquare, path: '/teacher/verify' },
     { name: 'AI Face Attendance', icon: Camera, path: '/face/attendance' },
-    { name: 'Face History', icon: History, path: '/face/history' },
+    { name: 'Face History', icon: Camera, path: '/face/history' },
   ];
 
   const parentMenuItems = [
