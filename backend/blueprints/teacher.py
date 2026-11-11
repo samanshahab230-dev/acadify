@@ -353,7 +353,7 @@ def mark_attendance():
 @login_required
 @role_required('teacher')
 def class_assignments():
-    """GET: all assignments by this teacher. POST: publish class-level assignment."""
+    """GET: all assignments by this teacher with submission counts. POST: publish."""
     db = get_db()
     try:
         uid = ObjectId(current_user.id)
@@ -361,12 +361,28 @@ def class_assignments():
         uid = current_user._id
     if request.method == 'GET':
         assignments = list(db.class_assignments.find({'teacher_id': uid}).sort('due_date', 1))
-        return jsonify({'assignments': [{
-            '_id': str(a['_id']), 'title': a.get('title', ''), 'subject': a.get('subject', ''),
-            'class_name': a.get('class_name', ''), 'department': a.get('department', ''),
-            'due_date': str(a.get('due_date', ''))[:10], 'priority': a.get('priority', 'medium'),
-            'description': a.get('description', ''), 'file_name': a.get('file_name', '')
-        } for a in assignments]})
+        result = []
+        for a in assignments:
+            subs = list(db.assignment_submissions.find({'assignment_id': a['_id']}))
+            sub_list = []
+            for s in subs:
+                student = db.students.find_one({'_id': s.get('student_id')})
+                user = db.users.find_one({'_id': student['user_id']}) if student else None
+                sub_list.append({
+                    'student_name': user.get('name', '') if user else '',
+                    'roll_no': student.get('roll_no', '') if student else '',
+                    'submitted_at': str(s.get('submitted_at', ''))[:10],
+                    'submission_note': s.get('submission_note', ''),
+                    'submission_file_name': s.get('submission_file_name', ''),
+                })
+            result.append({
+                '_id': str(a['_id']), 'title': a.get('title', ''), 'subject': a.get('subject', ''),
+                'class_name': a.get('class_name', ''), 'department': a.get('department', ''),
+                'due_date': str(a.get('due_date', ''))[:10], 'priority': a.get('priority', 'medium'),
+                'description': a.get('description', ''), 'file_name': a.get('file_name', ''),
+                'submissions': sub_list, 'submission_count': len(sub_list),
+            })
+        return jsonify({'assignments': result})
     data = request.form
     title = (data.get('title') or '').strip()
     subject = (data.get('subject') or '').strip()
@@ -391,6 +407,43 @@ def class_assignments():
         'created_at': datetime.datetime.now(datetime.timezone.utc)
     })
     return jsonify({'success': True, 'message': 'Assignment published.'}), 201
+
+
+@teacher_bp.route('/class-assignments/<assignment_id>/delete', methods=['POST'])
+@login_required
+@role_required('teacher')
+def delete_class_assignment(assignment_id):
+    db = get_db()
+    try:
+        uid = ObjectId(current_user.id)
+        aid = ObjectId(assignment_id)
+    except Exception:
+        return jsonify({'success': False}), 400
+    db.class_assignments.delete_one({'_id': aid, 'teacher_id': uid})
+    db.assignment_submissions.delete_many({'assignment_id': aid})
+    return jsonify({'success': True})
+
+
+@teacher_bp.route('/class-assignments/<assignment_id>/edit', methods=['POST'])
+@login_required
+@role_required('teacher')
+def edit_class_assignment(assignment_id):
+    db = get_db()
+    try:
+        uid = ObjectId(current_user.id)
+        aid = ObjectId(assignment_id)
+    except Exception:
+        return jsonify({'success': False}), 400
+    data = request.get_json(silent=True) or request.form
+    update = {}
+    for field in ('title', 'description', 'due_date', 'priority'):
+        val = (data.get(field) or '').strip()
+        if val:
+            update[field] = val
+    if not update:
+        return jsonify({'success': False, 'message': 'Nothing to update.'}), 400
+    db.class_assignments.update_one({'_id': aid, 'teacher_id': uid}, {'$set': update})
+    return jsonify({'success': True, 'message': 'Assignment updated.'})
 
 
 @teacher_bp.route('/timetable', methods=['GET', 'POST'])
