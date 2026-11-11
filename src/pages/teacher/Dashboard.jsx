@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Users, AlertTriangle, RefreshCw, X, TrendingUp, BookOpen, Clock, Calendar, BarChart3, CalendarCheck, CheckCircle } from 'lucide-react';
+import { Users, AlertTriangle, RefreshCw, X, TrendingUp, BookOpen, Clock, Calendar, BarChart3, CalendarCheck, CheckCircle, GraduationCap } from 'lucide-react';
 import api from '../../services/api';
 import AttendanceTab from './tabs/AttendanceTab';
 import MarksTab from './tabs/MarksTab';
@@ -20,6 +20,7 @@ const TABS = [
 export default function TeacherDashboard() {
   const [students, setStudents] = useState([]);
   const [atRisk, setAtRisk] = useState([]);
+  const [myCourses, setMyCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [toast, setToast] = useState({ msg: '', type: 'success' });
@@ -49,12 +50,14 @@ export default function TeacherDashboard() {
     Promise.all([
       api.get('/teacher/dashboard', version > 0 ? { noCache: true } : {}),
       api.get('/teacher/at-risk',   version > 0 ? { noCache: true } : {}),
+      api.get('/teacher/my-courses'),
     ])
-      .then(([d, r]) => {
+      .then(([d, r, c]) => {
         if (!active) return;
         const list = d.data.students || [];
         const risk = r.data?.students || [];
         setStudents(list); setAtRisk(risk);
+        setMyCourses(c.data?.courses || []);
         setSelectedStudent(prev => (!prev && list.length) ? list[0] : list.find(s => s._id === prev?._id) || prev);
         setLoading(false);
         try { sessionStorage.setItem(cacheKey, JSON.stringify({ students: list, atRisk: risk })); } catch {}
@@ -110,9 +113,27 @@ export default function TeacherDashboard() {
           { label: 'Total Students', value: students.length, icon: Users, color: 'cyan' },
           { label: 'Avg Attendance', value: `${avgAtt}%`, icon: TrendingUp, color: 'emerald' },
           { label: 'At-Risk', value: atRisk.length, icon: AlertTriangle, color: 'red' },
-          { label: 'Subjects', value: students[0]?.subjects?.length || 0, icon: BookOpen, color: 'purple' },
+          { label: 'My Courses', value: myCourses.length, icon: GraduationCap, color: 'purple' },
         ].map(s => <StatCard key={s.label} {...s} />)}
       </div>
+
+      {/* ── My Courses ── */}
+      {myCourses.length > 0 && (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+          <div className="flex items-center gap-2 text-blue-700 text-sm font-semibold mb-3">
+            <GraduationCap className="w-4 h-4" />
+            My Assigned Courses
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {myCourses.map(c => (
+              <div key={c._id} className="flex flex-col px-3 py-2 rounded-xl bg-white border border-blue-200 text-xs shadow-sm">
+                <span className="font-semibold text-blue-800">{c.subject}</span>
+                <span className="text-gray-500 mt-0.5">{c.department} · {c.class_name}{c.code ? ` · ${c.code}` : ''}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── At-Risk Alert ── */}
       {atRisk.length > 0 && (

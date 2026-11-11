@@ -89,6 +89,26 @@ def dashboard():
     return jsonify({'success': True, 'students': result})
 
 
+@teacher_bp.route('/my-courses')
+@login_required
+@role_required('teacher')
+def my_courses():
+    """Return all courses assigned to this teacher."""
+    db = get_db()
+    try:
+        uid = ObjectId(current_user.id)
+    except Exception:
+        uid = current_user._id
+    courses = list(db.courses.find({'teacher_id': {'$in': [uid, str(uid)]}}))
+    return jsonify({'courses': [{
+        '_id': str(c['_id']),
+        'subject': c.get('subject', ''),
+        'department': c.get('department', ''),
+        'class_name': c.get('class_name', ''),
+        'code': c.get('code', ''),
+    } for c in courses]})
+
+
 @teacher_bp.route('/my-departments')
 @login_required
 @role_required('teacher')
