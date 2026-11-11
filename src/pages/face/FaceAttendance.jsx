@@ -12,6 +12,7 @@ export default function FaceAttendance() {
 
   // Step 1 — cascade selectors
   const [allDepts, setAllDepts] = useState([]);
+  const [isTeacher, setIsTeacher] = useState(null);
   const [selDept, setSelDept] = useState('');
   const [classes, setClasses] = useState([]);
   const [selClass, setSelClass] = useState('');
@@ -35,8 +36,14 @@ export default function FaceAttendance() {
   useEffect(() => {
     // Use teacher's assigned departments if teacher, else admin all-departments
     const deptUrl = '/teacher/my-departments';
-    api.get(deptUrl).then(r => setAllDepts(r.data.departments || [])).catch(() =>
-      api.get('/admin/api/departments').then(r => setAllDepts(r.data.departments || [])).catch(() => {})
+    api.get(deptUrl).then(r => {
+      setIsTeacher(true);
+      setAllDepts(r.data.departments || []);
+    }).catch(() =>
+      api.get('/admin/api/departments').then(r => {
+        setIsTeacher(false);
+        setAllDepts(r.data.departments || []);
+      }).catch(() => setIsTeacher(false))
     );
     api.get('/api/face/status').then(() => setModelReady(true)).catch(() => setMessage('Face recognition models unavailable.'));
     loadTodaySessions();
@@ -48,23 +55,31 @@ export default function FaceAttendance() {
 
   // dept → classes
   useEffect(() => {
-    if (!selDept) { setClasses([]); setSelClass(''); setCourses([]); setSelCourse(''); return; }
-    api.get(`/admin/api/departments/classes?department=${encodeURIComponent(selDept)}`)
+    if (!selDept || isTeacher === null) { setClasses([]); setSelClass(''); setCourses([]); setSelCourse(''); return; }
+    const classesUrl = isTeacher
+      ? `/teacher/my-classes?department=${encodeURIComponent(selDept)}`
+      : `/admin/api/departments/classes?department=${encodeURIComponent(selDept)}`;
+    api.get(classesUrl)
       .then(r => setClasses(r.data.classes || []))
       .catch(() => setClasses([]));
-  }, [selDept]);
+  }, [selDept, isTeacher]);
 
   // class → courses
   useEffect(() => {
     if (!selDept || !selClass) { setCourses([]); setSelCourse(''); return; }
-    api.get(`/admin/api/courses?department=${encodeURIComponent(selDept)}`)
+    const coursesUrl = isTeacher
+      ? '/teacher/my-courses'
+      : `/admin/api/courses?department=${encodeURIComponent(selDept)}`;
+    api.get(coursesUrl)
       .then(r => {
-        const filtered = (r.data.courses || []).filter(c => c.class_name === selClass);
+        const filtered = (r.data.courses || []).filter(c =>
+          c.class_name === selClass && (!c.department || c.department === selDept)
+        );
         setCourses(filtered);
         setSelCourse('');
       })
       .catch(() => setCourses([]));
-  }, [selDept, selClass]);
+  }, [selDept, selClass, isTeacher]);
 
   const loadTodaySessions = () => {
     api.get('/api/face/sessions', { noCache: true })
