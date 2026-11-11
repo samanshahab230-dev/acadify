@@ -369,11 +369,15 @@ def class_assignments():
                 student = db.students.find_one({'_id': s.get('student_id')})
                 user = db.users.find_one({'_id': student['user_id']}) if student else None
                 sub_list.append({
+                    'student_id': str(s.get('student_id', '')),
                     'student_name': user.get('name', '') if user else '',
                     'roll_no': student.get('roll_no', '') if student else '',
                     'submitted_at': str(s.get('submitted_at', ''))[:10],
                     'submission_note': s.get('submission_note', ''),
                     'submission_file_name': s.get('submission_file_name', ''),
+                    'marks': s.get('marks'),
+                    'feedback': s.get('feedback', ''),
+                    'resubmit_allowed': s.get('resubmit_allowed', False),
                 })
             result.append({
                 '_id': str(a['_id']), 'title': a.get('title', ''), 'subject': a.get('subject', ''),
@@ -422,6 +426,54 @@ def delete_class_assignment(assignment_id):
     db.class_assignments.delete_one({'_id': aid, 'teacher_id': uid})
     db.assignment_submissions.delete_many({'assignment_id': aid})
     return jsonify({'success': True})
+
+
+@teacher_bp.route('/class-assignments/<assignment_id>/submission/marks', methods=['POST'])
+@login_required
+@role_required('teacher')
+def mark_submission(assignment_id):
+    """Give marks to a student's submission."""
+    db = get_db()
+    data = request.get_json(silent=True) or {}
+    student_id = (data.get('student_id') or '').strip()
+    marks = data.get('marks')
+    feedback = (data.get('feedback') or '').strip()
+    if not student_id or marks is None:
+        return jsonify({'success': False, 'message': 'student_id and marks required.'}), 400
+    try:
+        aid = ObjectId(assignment_id)
+        sid = ObjectId(student_id)
+        marks = float(marks)
+    except Exception:
+        return jsonify({'success': False, 'message': 'Invalid data.'}), 400
+    db.assignment_submissions.update_one(
+        {'assignment_id': aid, 'student_id': sid},
+        {'$set': {'marks': marks, 'feedback': feedback, 'marked_at': datetime.datetime.now(datetime.timezone.utc)}}
+    )
+    return jsonify({'success': True, 'message': 'Marks saved.'})
+
+
+@teacher_bp.route('/class-assignments/<assignment_id>/submission/resubmit', methods=['POST'])
+@login_required
+@role_required('teacher')
+def allow_resubmit(assignment_id):
+    """Allow a specific student to resubmit their assignment."""
+    db = get_db()
+    data = request.get_json(silent=True) or {}
+    student_id = (data.get('student_id') or '').strip()
+    if not student_id:
+        return jsonify({'success': False, 'message': 'student_id required.'}), 400
+    try:
+        aid = ObjectId(assignment_id)
+        sid = ObjectId(student_id)
+    except Exception:
+        return jsonify({'success': False, 'message': 'Invalid IDs.'}), 400
+    db.assignment_submissions.update_one(
+        {'assignment_id': aid, 'student_id': sid},
+        {'$set': {'resubmit_allowed': True, 'status': 'pending'}},
+        upsert=True
+    )
+    return jsonify({'success': True, 'message': 'Resubmission allowed.'})
 
 
 @teacher_bp.route('/class-assignments/<assignment_id>/edit', methods=['POST'])

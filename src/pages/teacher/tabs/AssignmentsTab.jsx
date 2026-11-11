@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Trash2, Pencil, ChevronDown, ChevronUp, Check, X } from 'lucide-react';
+import { Trash2, Pencil, ChevronDown, ChevronUp, Check, X, RotateCcw } from 'lucide-react';
 import api from '../../../services/api';
 
 const PRI = { high: 'bg-red-100 text-red-700', medium: 'bg-amber-100 text-amber-700', low: 'bg-emerald-100 text-emerald-700' };
@@ -17,6 +17,9 @@ export default function AssignmentsTab({ onMessage }) {
   const [expandedSubs, setExpandedSubs] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
+  // marks state: { [assignmentId_studentId]: { marks, feedback } }
+  const [marksForm, setMarksForm] = useState({});
+  const [savingMarks, setSavingMarks] = useState({});
 
   useEffect(() => {
     api.get('/teacher/my-departments').then(r => setDepts(r.data.departments || [])).catch(() => {});
@@ -87,6 +90,31 @@ export default function AssignmentsTab({ onMessage }) {
     } catch { onMessage('Failed to update.', 'error'); }
   };
 
+  const marksKey = (aid, sid) => `${aid}_${sid}`;
+
+  const handleSaveMarks = async (assignmentId, studentId) => {
+    const key = marksKey(assignmentId, studentId);
+    const { marks, feedback } = marksForm[key] || {};
+    if (marks === undefined || marks === '') { onMessage('Enter marks first.', 'error'); return; }
+    setSavingMarks(s => ({ ...s, [key]: true }));
+    try {
+      await api.post(`/teacher/class-assignments/${assignmentId}/submission/marks`, {
+        student_id: studentId, marks: parseFloat(marks), feedback: feedback || ''
+      });
+      onMessage('Marks saved.');
+      loadAssignments(true);
+    } catch { onMessage('Failed to save marks.', 'error'); }
+    finally { setSavingMarks(s => ({ ...s, [key]: false })); }
+  };
+
+  const handleAllowResubmit = async (assignmentId, studentId) => {
+    try {
+      await api.post(`/teacher/class-assignments/${assignmentId}/submission/resubmit`, { student_id: studentId });
+      onMessage('Resubmission allowed for student.');
+      loadAssignments(true);
+    } catch { onMessage('Failed.', 'error'); }
+  };
+
   return (
     <div className="space-y-7">
       <h3 className="text-sm font-bold text-gray-700 uppercase tracking-widest">Publish Assignment</h3>
@@ -153,7 +181,6 @@ export default function AssignmentsTab({ onMessage }) {
         {assignments.length === 0 && <p className="text-sm text-gray-400">No assignments published yet.</p>}
         {assignments.map(a => (
           <div key={a._id} className="rounded-xl border border-gray-200 overflow-hidden">
-            {/* Header row */}
             {editingId === a._id ? (
               <div className="p-4 space-y-3 bg-amber-50 border-b border-amber-200">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -211,17 +238,75 @@ export default function AssignmentsTab({ onMessage }) {
                 {a.submissions.length === 0 ? (
                   <p className="px-4 py-3 text-xs text-gray-400 italic">No submissions yet.</p>
                 ) : (
-                  a.submissions.map((s, i) => (
-                    <div key={i} className="px-4 py-3 flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800">{s.student_name} <span className="text-gray-400 font-normal">({s.roll_no})</span></p>
-                        <p className="text-xs text-gray-500 mt-0.5">Submitted: {s.submitted_at || '—'}</p>
-                        {s.submission_note && <p className="text-xs text-gray-500 mt-0.5">Note: {s.submission_note}</p>}
-                        {s.submission_file_name && <p className="text-xs text-blue-500 mt-0.5">📎 {s.submission_file_name}</p>}
+                  a.submissions.map((s, i) => {
+                    const key = marksKey(a._id, s.student_id);
+                    const mf = marksForm[key] || { marks: s.marks ?? '', feedback: s.feedback || '' };
+                    return (
+                      <div key={i} className="px-4 py-4 space-y-3">
+                        {/* Student info row */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-800">
+                              {s.student_name} <span className="text-gray-400 font-normal">({s.roll_no})</span>
+                            </p>
+                            <p className="text-xs text-gray-500 mt-0.5">Submitted: {s.submitted_at || '—'}</p>
+                            {s.submission_note && <p className="text-xs text-gray-500 mt-0.5">Note: {s.submission_note}</p>}
+                            {s.submission_file_name && <p className="text-xs text-blue-500 mt-0.5">📎 {s.submission_file_name}</p>}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {s.marks != null && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">
+                                {s.marks} marks
+                              </span>
+                            )}
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.resubmit_allowed ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                              {s.resubmit_allowed ? 'Resubmit Allowed' : 'Submitted'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Marks + feedback row */}
+                        <div className="flex flex-wrap items-end gap-2">
+                          <div className="space-y-1">
+                            <label className="text-xs text-gray-500">Marks</label>
+                            <input
+                              type="number" min="0" step="0.5"
+                              value={mf.marks}
+                              onChange={e => setMarksForm(f => ({ ...f, [key]: { ...mf, marks: e.target.value } }))}
+                              className="field-input w-24 text-sm"
+                              placeholder="e.g. 18"
+                            />
+                          </div>
+                          <div className="space-y-1 flex-1 min-w-[140px]">
+                            <label className="text-xs text-gray-500">Feedback (optional)</label>
+                            <input
+                              value={mf.feedback}
+                              onChange={e => setMarksForm(f => ({ ...f, [key]: { ...mf, feedback: e.target.value } }))}
+                              className="field-input text-sm w-full"
+                              placeholder="Good work..."
+                            />
+                          </div>
+                          <button
+                            onClick={() => handleSaveMarks(a._id, s.student_id)}
+                            disabled={savingMarks[key]}
+                            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-40 shrink-0"
+                          >
+                            <Check className="w-3 h-3" />
+                            {savingMarks[key] ? 'Saving...' : 'Save Marks'}
+                          </button>
+                          {!s.resubmit_allowed && (
+                            <button
+                              onClick={() => handleAllowResubmit(a._id, s.student_id)}
+                              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 shrink-0"
+                              title="Allow this student to resubmit"
+                            >
+                              <RotateCcw className="w-3 h-3" /> Allow Resubmit
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium shrink-0">Submitted</span>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             )}

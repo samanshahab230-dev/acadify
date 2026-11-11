@@ -267,6 +267,9 @@ def assignments():
                     'submission_note': note,
                     'submission_file_path': sub_file_path,
                     'submission_file_name': sub_file_name,
+                    'resubmit_allowed': False,
+                    'marks': None,
+                    'feedback': '',
                 }},
                 upsert=True
             )
@@ -291,12 +294,16 @@ def assignments():
         sub = db.assignment_submissions.find_one({'assignment_id': a['_id'], 'student_id': sid})
         result.append({
             '_id': str(a['_id']), 'title': a.get('title', ''), 'subject': a.get('subject', ''),
-            'due_date': str(a.get('due_date', ''))[:10], 'status': sub['status'] if sub else 'pending',
+            'due_date': str(a.get('due_date', ''))[:10],
+            'status': sub['status'] if sub else 'pending',
+            'resubmit_allowed': sub.get('resubmit_allowed', False) if sub else False,
             'priority': a.get('priority', 'medium'), 'description': a.get('description', ''),
             'file_name': a.get('file_name'), 'file_path': a.get('file_path'),
             'submitted_at': str(sub.get('submitted_at', '') or '')[:10] if sub else '',
             'submission_note': sub.get('submission_note', '') if sub else '',
             'submission_file_name': sub.get('submission_file_name') if sub else None,
+            'marks': sub.get('marks') if sub else None,
+            'feedback': sub.get('feedback', '') if sub else '',
         })
     return jsonify({'assignments': result, 'today': today})
 
