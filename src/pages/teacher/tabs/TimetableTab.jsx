@@ -6,6 +6,7 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 
 export default function TimetableTab({ onMessage }) {
   const [slots, setSlots] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [form, setForm] = useState({ day: 'Monday', time: '', subject: '', room: '', class_name: '' });
   const [saving, setSaving] = useState(false);
 
@@ -15,7 +16,17 @@ export default function TimetableTab({ onMessage }) {
       .catch(() => {});
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    // Load teacher's assigned classes for dropdown
+    api.get('/teacher/my-courses')
+      .then(r => {
+        const unique = [...new Set((r.data.courses || []).map(c => c.class_name).filter(Boolean))];
+        setClasses(unique);
+        if (unique.length) setForm(f => ({ ...f, class_name: unique[0] }));
+      })
+      .catch(() => {});
+  }, []);
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -62,8 +73,15 @@ export default function TimetableTab({ onMessage }) {
             <input value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} className="field-input" placeholder="e.g. Math" required />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Class</label>
-            <input value={form.class_name} onChange={e => setForm(f => ({ ...f, class_name: e.target.value }))} className="field-input" placeholder="e.g. Class 9A" />
+            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Class *</label>
+            {classes.length > 0 ? (
+              <select value={form.class_name} onChange={e => setForm(f => ({ ...f, class_name: e.target.value }))} className="field-input" required>
+                <option value="">Select class</option>
+                {classes.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            ) : (
+              <input value={form.class_name} onChange={e => setForm(f => ({ ...f, class_name: e.target.value }))} className="field-input" placeholder="e.g. Class 9A" required />
+            )}
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Room</label>
