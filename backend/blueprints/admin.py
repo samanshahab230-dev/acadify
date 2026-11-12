@@ -432,8 +432,12 @@ def predict_form():
 @role_required('admin')
 def prediction_delete(id):
     if PredictionModel.delete(id):
+        if request.is_json or request.accept_mimetypes.best == 'application/json':
+            return jsonify({'success': True, 'message': 'Prediction deleted.'})
         flash('Prediction record deleted.', 'success')
     else:
+        if request.is_json or request.accept_mimetypes.best == 'application/json':
+            return jsonify({'success': False, 'message': 'Prediction not found or could not be deleted.'}), 404
         flash('Failed to delete prediction.', 'danger')
     return redirect(request.referrer or url_for('admin.predictions'))
 

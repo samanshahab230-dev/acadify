@@ -56,8 +56,30 @@ class PredictionModel:
     def delete(prediction_id):
         db = get_db()
         pid = ObjectId(prediction_id) if isinstance(prediction_id, str) else prediction_id
+        prediction = db.predictions.find_one({'_id': pid}, {'student_id': 1})
+        if not prediction:
+            return False
         result = db.predictions.delete_one({'_id': pid})
-        return result.deleted_count > 0
+        if not result.deleted_count:
+            return False
+
+        student_id = prediction.get('student_id')
+        latest = db.predictions.find_one({'student_id': student_id}, sort=[('predicted_at', -1)])
+        if latest:
+            db.students.update_one(
+                {'_id': student_id},
+                {'$set': {
+                    'risk_score': latest.get('risk_score', 0),
+                    'risk_level': latest.get('risk_level', 'LOW'),
+                    'last_prediction': latest,
+                }}
+            )
+        else:
+            db.students.update_one(
+                {'_id': student_id},
+                {'$unset': {'risk_score': '', 'risk_level': '', 'last_prediction': ''}}
+            )
+        return True
 
     @staticmethod
     def get_all(risk_level=None, limit=50):
