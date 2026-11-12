@@ -1243,6 +1243,10 @@ def api_course_create():
     if not department or not class_name or not subject:
         return jsonify({'success': False, 'message': 'Department, class, and subject are required.'}), 400
     course = CourseModel.create(department, class_name, subject, teacher_id)
+    db = get_db()
+    class_students = db.students.find({'department': department, 'class_name': class_name}, {'_id': 1})
+    for student in class_students:
+        CourseModel.enroll_student(str(course['_id']), student['_id'])
     return jsonify({'success': True, 'message': 'Course created.', 'course_id': str(course['_id'])}), 201
 
 

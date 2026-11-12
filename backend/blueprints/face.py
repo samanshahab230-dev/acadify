@@ -123,6 +123,7 @@ def api_face_sessions():
         {
             'session_id': str(s['_id']),
             'subject': s['subject'],
+            'course_id': str(s['course_id']) if s.get('course_id') else '',
             'date': s['date'],
             'day': s['day'],
             'label': s.get('label', ''),
@@ -154,18 +155,36 @@ def api_create_session():
 
     day = date_obj.strftime('%A')
 
-    # Count enrolled students from course_enrollments if course_id given
+    course = None
     if course_id:
         try:
-            enrolled_ids = db.course_enrollments.distinct('student_id', {'course_id': ObjectId(course_id)})
+            course_oid = ObjectId(course_id)
         except Exception:
-            enrolled_ids = []
+            return jsonify({'success': False, 'message': 'Invalid course.'}), 400
+        course = db.courses.find_one({'_id': course_oid})
+        if not course:
+            return jsonify({'success': False, 'message': 'Course not found.'}), 404
+        class_students = db.students.find(
+            {'department': course.get('department'), 'class_name': course.get('class_name')},
+            {'_id': 1}
+        )
+        for student in class_students:
+            db.course_enrollments.update_one(
+                {'course_id': course_oid, 'student_id': student['_id']},
+                {'$setOnInsert': {
+                    'course_id': course_oid,
+                    'student_id': student['_id'],
+                    'enrolled_at': datetime.datetime.now(datetime.timezone.utc),
+                }},
+                upsert=True
+            )
+        enrolled_ids = db.course_enrollments.distinct('student_id', {'course_id': course_oid})
     else:
         enrolled_ids = db.attendance_subjects.distinct('student_id', {'subject': subject})
 
     session_doc = {
         'subject': subject,
-        'course_id': ObjectId(course_id) if course_id else None,
+        'course_id': course['_id'] if course else None,
         'date': date_str,
         'day': day,
         'label': label,
@@ -485,30 +504,89 @@ def api_recognize():
 
             # ── Attendance ────────────────────────────────────────────────────
             from models.attendance import AttendanceModel
-            enrolled_subjects = AttendanceModel.get_subjects(recog['student_id'])
-            if not enrolled_subjects:
-                student = get_db().students.find_one({'_id': ObjectId(recog['student_id'])})
-                if student:
+            db = get_db()
+            session = None
+            try:
+                session = db.attendance_sessions.find_one({'_id': ObjectId(session_id)})
+            except Exception:
+                pass
+            course_id = (session or {}).get('course_id')
+            course = db.courses.find_one({'_id': course_id}) if course_id else None
+            student = db.students.find_one({'_id': ObjectId(recog['student_id'])})
+
+            if course:
+                enrollment = db.course_enrollments.find_one({
+                    'course_id': course['_id'], 'student_id': student['_id']
+                })
+                same_class = (
+                    student.get('department') == course.get('department')
+                    and student.get('class_name') == course.get('class_name')
+                )
+                if not enrollment and same_class:
+                    db.course_enrollments.update_one(
+                        {'course_id': course['_id'], 'student_id': student['_id']},
+                        {'$setOnInsert': {
+                            'course_id': course['_id'],
+                            'student_id': student['_id'],
+                            'enrolled_at': datetime.datetime.now(datetime.timezone.utc),
+                        }},
+                        upsert=True
+                    )
+                    enrollment = True
+                if not enrollment:
+                    return jsonify({
+                        'success': False,
+                        'recognized': True,
+                        'student_name': recog['student_name'],
+                        'roll_no': recog['roll_no'],
+                        'message': 'This student is not registered in the selected course class.',
+                    }), 409
+                try:
+                    session_date = datetime.datetime.strptime(session.get('date', ''), '%Y-%m-%d').date()
+                except (AttributeError, TypeError, ValueError):
+                    session_date = datetime.date.today()
+                now = datetime.datetime.now(datetime.timezone.utc)
+                marked_at = datetime.datetime.combine(session_date, now.timetz())
+            else:
+                enrolled_subjects = AttendanceModel.get_subjects(recog['student_id'])
+                if not enrolled_subjects and student:
                     AttendanceModel.seed_subjects(
                         student['_id'], student.get('department', ''), student.get('semester', 1)
                     )
                     enrolled_subjects = AttendanceModel.get_subjects(recog['student_id'])
-            available_subjects = [
-                {'subject': item['subject']} for item in enrolled_subjects if item.get('subject')
-            ]
-            if subject not in {item['subject'] for item in available_subjects}:
-                return jsonify({
-                    'success': False,
-                    'recognized': True,
-                    'student_name': recog['student_name'],
-                    'roll_no': recog['roll_no'],
-                    'message': 'This student is not enrolled in the selected subject.',
-                    'available_subjects': available_subjects
-                }), 409
-            marked_at = datetime.datetime.now(datetime.timezone.utc)
+                available_subjects = [
+                    {'subject': item['subject']} for item in enrolled_subjects if item.get('subject')
+                ]
+                if subject not in {item['subject'] for item in available_subjects}:
+                    return jsonify({
+                        'success': False,
+                        'recognized': True,
+                        'student_name': recog['student_name'],
+                        'roll_no': recog['roll_no'],
+                        'message': 'This student is not enrolled in the selected subject.',
+                        'available_subjects': available_subjects
+                    }), 409
+                marked_at = datetime.datetime.now(datetime.timezone.utc)
+
             tracker_ok, tracker_message, tracker_record = AttendanceModel.mark_face_attendance(
                 recog['student_id'], subject, marked_at
             )
+            if course:
+                course_date = marked_at.replace(hour=0, minute=0, second=0, microsecond=0)
+                db.course_attendance.update_one(
+                    {'course_id': course['_id'], 'student_id': student['_id'], 'date': course_date},
+                    {'$set': {
+                        'status': 'present',
+                        'marked_by': str(current_user._id),
+                        'source': 'face_recognition',
+                        'updated_at': marked_at,
+                    }, '$setOnInsert': {
+                        'course_id': course['_id'],
+                        'student_id': student['_id'],
+                        'date': course_date,
+                    }},
+                    upsert=True
+                )
             if not tracker_ok:
                 response['attendance']     = 'Already marked'
                 response['already_marked'] = True
